@@ -2,6 +2,8 @@ const path = require("path");
 
 const BRAND = {
   name: "Atlas Geek",
+  legalName: "Atlasgeek Technology and Consultant LLP",
+  address: "Sector 2, Greater Noida West, Gautam Buddha Nagar, Uttar Pradesh – 201307",
   website: "https://atlasgeek.in",
   email: "business@atlasgeek.in",
   logoPath: path.resolve(__dirname, "../../assets/atlasgeek_logo.png"),

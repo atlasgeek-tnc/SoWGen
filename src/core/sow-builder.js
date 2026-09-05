@@ -61,13 +61,29 @@ class SowBuilder {
 
   createSubtitle(text) {
     return new Paragraph({
-      spacing: { before: 80, after: 240 },
+      spacing: { before: 60, after: 180 },
       alignment: AlignmentType.CENTER,
       children: [
         new TextRun({
           text,
-          size: 24,
+          size: 22,
           color: BRAND.colors.muted,
+          font: BRAND.fonts.primary,
+        }),
+      ],
+    });
+  }
+
+  createProjectTitle(text) {
+    return new Paragraph({
+      spacing: { before: 60, after: 60 },
+      alignment: AlignmentType.CENTER,
+      children: [
+        new TextRun({
+          text,
+          bold: true,
+          size: 26,
+          color: BRAND.colors.dark,
           font: BRAND.fonts.primary,
         }),
       ],
@@ -302,30 +318,27 @@ class SowBuilder {
 
     docChildren.push(
       this.createTitle("STATEMENT OF WORK"),
-      this.createSubtitle(`${spec.name} — ${engagementType} Engagement`),
-      new Paragraph({ spacing: { before: 200, after: 100 }, children: [] }),
+      this.createProjectTitle(projectName),
+      this.createSubtitle(`${clientName} — Powered by ${spec.name} Services`),
+      new Paragraph({ spacing: { before: 140, after: 60 }, children: [] }),
       this.createTable(
-        ["Engagement Attribute", "Details"],
+        ["Attribute", "Engagement Specification"],
         [
-          ["Customer Name", clientName],
-          ["Partner Name", `${BRAND.name} (${BRAND.website})`],
-          ["Project Title", projectName],
-          ["Cloud Provider / Program", `${spec.name} (${spec.program})`],
-          ["Engagement Scope", engagementType],
-          ["Document Date", this.date],
-          [
-            "Target Effective Date",
-            provider === "google"
-              ? "At least 7 business days post-submission / Subject to Google PSF approval"
-              : "Mutual execution of this Statement of Work",
-          ],
-          ["Governing Agreement", `Atlas Geek Master Services Agreement (MSA) or Customer Services Terms`],
-          ["Document Version", this.version],
-          ["Commercial Model", spec.commercialModel],
+          ["Prepared by:", BRAND.legalName || "Atlasgeek Technology and Consultant LLP"],
+          ["Address:", BRAND.address || "Sector 2, Greater Noida West, Gautam Buddha Nagar, Uttar Pradesh – 201307"],
+          ["Prepared for:", `${clientName} (https://${clientName.toLowerCase().replace(/[^a-z0-9]/g, "")}.com/)`],
+          ["Engagement Scope:", `${spec.name} ${engagementType}`],
+          ["Document Version:", this.version],
+          ["Classification:", "Confidential"],
+          ["Date:", this.date],
+          ["SOW Type:", "Fixed-Price | Milestone-Based Implementation"],
+          [`${spec.name} Program:`, `${spec.program}`],
+          ["Partner Credential:", spec.partnerCredential || "Google Cloud Certified Consulting Partner"],
+          ["Governing Agreement:", "Atlas Geek Master Services Agreement (MSA) or Customer Terms"],
         ],
-        [3200, 5800]
+        [3000, 6000]
       ),
-      new Paragraph({ spacing: { before: 200, after: 0 }, children: [] }),
+      new Paragraph({ spacing: { before: 140, after: 0 }, children: [] }),
       this.createCallout(
         `Commercial & Governance Framework (${spec.name})`,
         provider === "google"
@@ -514,13 +527,26 @@ class SowBuilder {
       ["Ongoing Infrastructure Consumption Billing", "Accountable (A)", "Informed (I)", "Direct Billing"],
     ];
 
+    const effortTable = data.effortTable || [
+      ["Role / Resource", "Core Responsibilities & Delivery Focus", "Estimated Hours", "Weekly Allocation"],
+      ["Lead Cloud Architect (Certified Professional)", "Architecture design, security governance, Google PSF alignment, executive reviews", "60 Hours", "8–10 hrs/week"],
+      ["Senior GenAI & Antigravity Solutions Engineer", "Antigravity login unblocking, Cursor rules translation, custom .gemini/skills, MCP setup", "120 Hours", "15–20 hrs/week"],
+      ["Cloud DevOps & IAM Security Specialist", "Google Admin Console license mapping, Companion API enablement, IAM role bindings, Terraform IaC", "60 Hours", "8–10 hrs/week"],
+      ["Total Technical Delivery Effort", "Estimated Professional Services Engineering Sizing", "240 Hours", "~35 hrs/week across team"],
+    ];
+
     docChildren.push(
       this.createSectionHeading("6. Roles, Responsibilities & Governance"),
       this.createParagraph(
         `Project delivery operates under a structured RACI governance framework (Responsible, Accountable, Consulted, Informed). Per cloud partner governance guidelines, ${hyperscalerLabel} does not perform project delivery tasks and holds no delivery responsibilities in this SOW.`
       ),
       this.createTable(raciTable[0], raciTable.slice(1), [3200, 1800, 2500, 1500]),
-      this.createSubHeading("6.1 Partner Credentials & Certifications"),
+      this.createSubHeading("6.1 Technical Scoping & Estimated Delivery Effort"),
+      this.createParagraph(
+        "To ensure delivery excellence and resource availability, technical effort is scoped based on estimated engineering hours across certified roles. In accordance with Google Cloud PSF guidelines, services are outcome-based and fixed-scope without artificial hourly caps."
+      ),
+      this.createTable(effortTable[0], effortTable.slice(1), [2600, 3600, 1400, 1400]),
+      this.createSubHeading("6.2 Partner Credentials & Certifications"),
       this.createParagraph(
         `Atlas Geek will assign certified engineering resources to this engagement in compliance with ${spec.name} professional delivery criteria:`
       ),
@@ -564,26 +590,45 @@ class SowBuilder {
 
     // --- SECTION 9: COMMERCIAL TERMS & PRICING ---
     const pricingRows = [];
-    let cumulativeFee = 0;
+    const isPlaceholder = data.usePlaceholderPricing !== false;
 
-    spec.milestoneSplit.forEach((m, idx) => {
-      const isLast = idx === spec.milestoneSplit.length - 1;
-      const amount = isLast ? totalFee - cumulativeFee : Math.round(totalFee * m.pct);
-      cumulativeFee += amount;
-      pricingRows.push([m.name, m.desc, `${Math.round(m.pct * 100)}%`, `$${amount.toLocaleString()} USD`]);
-    });
+    if (isPlaceholder) {
+      spec.milestoneSplit.forEach((m) => {
+        pricingRows.push([
+          m.name,
+          m.desc,
+          `${Math.round(m.pct * 100)}%`,
+          "$XXXX USD",
+        ]);
+      });
 
-    pricingRows.push([
-      "Total Professional Services Fee",
-      "Fixed Price Commercial Model (Exclusive of applicable local taxes)",
-      "100%",
-      `$${totalFee.toLocaleString()} USD`,
-    ]);
+      pricingRows.push([
+        "Total Professional Services Fee",
+        "Fixed Price Commercial Model (Seller to populate agreed fee upon PSF alignment)",
+        "100%",
+        "$XXXX USD",
+      ]);
+    } else {
+      let cumulativeFee = 0;
+      spec.milestoneSplit.forEach((m, idx) => {
+        const isLast = idx === spec.milestoneSplit.length - 1;
+        const amount = isLast ? totalFee - cumulativeFee : Math.round(totalFee * m.pct);
+        cumulativeFee += amount;
+        pricingRows.push([m.name, m.desc, `${Math.round(m.pct * 100)}%`, `$${amount.toLocaleString()} USD`]);
+      });
+
+      pricingRows.push([
+        "Total Professional Services Fee",
+        "Fixed Price Commercial Model (Exclusive of applicable local taxes)",
+        "100%",
+        `$${totalFee.toLocaleString()} USD`,
+      ]);
+    }
 
     docChildren.push(
       this.createSectionHeading("9. Commercial Terms & Pricing"),
       this.createParagraph(
-        `This engagement is executed on a Fixed Price commercial basis in United States Dollars (USD), aligned with ${spec.commercialModel}.`
+        `This engagement is executed on a Fixed Price commercial basis in United States Dollars (USD), aligned with ${spec.commercialModel}. Pricing amounts are to be populated upon final commercial and funding approval.`
       ),
       this.createTable(
         ["Payment Milestone", "Deliverables & Triggers", "Percentage", "Amount (USD)"],
@@ -620,88 +665,8 @@ class SowBuilder {
           ? "By signing below, the parties agree to the terms, activities, deliverables, and conditions set forth in this Statement of Work. Both parties acknowledge that this SOW is to be formally executed only after Google Cloud PSF Fund Request approval has been received."
           : "By signing below, the authorized representatives of the parties agree to the terms, activities, deliverables, and conditions set forth in this Statement of Work."
       ),
-      this.createTable(signaturesTable[0], signaturesTable.slice(1), [2600, 3200, 3200]),
-      new Paragraph({ children: [new PageBreak()] })
+      this.createTable(signaturesTable[0], signaturesTable.slice(1), [2600, 3200, 3200])
     );
-
-    // --- APPENDIX A: HYPERSCALER BUSINESS CASE ---
-    if (provider === "google") {
-      docChildren.push(
-        this.createSectionHeading("Appendix A: Google Cloud Business Case & ROI Justification"),
-        this.createParagraph(
-          "Note: This Appendix is prepared for Google Cloud Partner Services Funds reviewers to demonstrate business justification and strategic consumption impact."
-        ),
-        this.createTable(
-          ["Metric", "Value / Justification"],
-          [
-            ["Estimated First Year Google Cloud ARR", `$${(totalFee * 10).toLocaleString()} USD`],
-            ["Projected 3-Year Google Cloud Lifetime Value (LTV)", `$${(totalFee * 25).toLocaleString()} USD`],
-            ["Expected PSF Investment ROI Ratio", "10:1 Consumption ROI within 12 months"],
-            ["Target Eligible Google Cloud Products", "Compute Engine, Google Kubernetes Engine (GKE), Cloud SQL, BigQuery, Vertex AI, Cloud Storage"],
-            ["Strategic Business Impact", "Unlocks modernization, eliminates on-prem legacy debt, and establishes foundation for enterprise AI & analytics adoption."],
-          ],
-          [3200, 5800]
-        ),
-        this.createSectionHeading("Appendix B: Google PSF Submission & Review Guidelines"),
-        this.createParagraph(
-          "This Statement of Work must be submitted by Atlas Geek via the Google Cloud Partner Advantage Portal. Atlas Geek will share the document directly with the designated regional Google Partner Services Funds approver team."
-        ),
-        this.createSubHeading("Google Regional Approver Contacts:"),
-        this.createTable(
-          ["Region / Segment", "Approver Email Address"],
-          Object.entries(spec.approverRouting || {}).map(([r, e]) => [r, e]),
-          [3500, 5500]
-        )
-      );
-    } else if (provider === "aws") {
-      docChildren.push(
-        this.createSectionHeading("Appendix A: AWS Migration Business Case & MAP 2.0 Justification"),
-        this.createParagraph(
-          "Note: This Appendix aligns with AWS Migration Acceleration Program (MAP 2.0) and APN Partner funding guidelines."
-        ),
-        this.createTable(
-          ["Metric", "Value / Justification"],
-          [
-            ["Estimated Annual AWS Cloud Consumption", `$${(totalFee * 8).toLocaleString()} USD`],
-            ["Target Eligible AWS Services", "Amazon EKS, Amazon EC2, Amazon Aurora PostgreSQL, AWS Lambda, Amazon S3, Amazon OpenSearch"],
-            ["Modernization Methodology", "AWS Well-Architected Framework 6 Pillars; Infrastructure as Code via Terraform."],
-            ["Proof of Execution (POE)", "Landing Zone sign-off, migration execution logs, and Well-Architected Review report."],
-          ],
-          [3200, 5800]
-        )
-      );
-    } else if (provider === "azure") {
-      docChildren.push(
-        this.createSectionHeading("Appendix A: Microsoft Azure AMMP Business Case & CAF Assessment"),
-        this.createParagraph(
-          "Note: This Appendix aligns with Microsoft Azure Migration and Modernization Program (AMMP) and Cloud Adoption Framework (CAF) guidelines."
-        ),
-        this.createTable(
-          ["Metric", "Value / Justification"],
-          [
-            ["Estimated Annual Azure Cloud Consumption", `$${(totalFee * 8).toLocaleString()} USD`],
-            ["Target Eligible Azure Services", "Azure Kubernetes Service (AKS), Azure SQL Database, Azure Virtual Networks, Azure Monitor, Blob Storage"],
-            ["Governance Framework", "Azure Landing Zones, Enterprise Scale Architecture, Microsoft Entra ID integration."],
-            ["Proof of Execution (POE)", "Deployment verification logs, CAF landing zone sign-off, and customer acceptance."],
-          ],
-          [3200, 5800]
-        )
-      );
-    } else {
-      docChildren.push(
-        this.createSectionHeading("Appendix A: Solution Architecture Quality Assurance & Delivery Gates"),
-        this.createTable(
-          ["Delivery Gate", "Review Criteria & Deliverable Output"],
-          [
-            ["Gate 1: Architecture Alignment", "ADD reviewed, network topology and security boundaries signed off."],
-            ["Gate 2: Environment Readiness", "Dev & UAT infrastructure provisioned via IaC; automated smoke tests passed."],
-            ["Gate 3: Cutover Verification", "Production cutover executed with zero P1/P2 operational defects."],
-            ["Gate 4: Project Sign-Off", "Runbooks delivered, KT recorded, and formal completion certificate signed."],
-          ],
-          [3200, 5800]
-        )
-      );
-    }
 
     // --- HEADER AND FOOTER ---
     const docHeader = new Header({
