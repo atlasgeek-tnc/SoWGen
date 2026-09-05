@@ -147,14 +147,14 @@ class ClientResolver {
     return files;
   }
 
-  // Get all output files inside outputDir
+  // Get all deliverable files inside outputDir (strictly .docx files)
   getOutputFiles(clientName) {
     const { outputDir } = this.getClientPaths(clientName);
     if (!fs.existsSync(outputDir)) return [];
 
     return fs
       .readdirSync(outputDir, { withFileTypes: true })
-      .filter((entry) => !entry.isDirectory() && !entry.name.startsWith("."))
+      .filter((entry) => !entry.isDirectory() && entry.name.endsWith(".docx") && !entry.name.startsWith("."))
       .map((entry) => {
         const fullPath = path.join(outputDir, entry.name);
         const stats = fs.statSync(fullPath);
@@ -163,12 +163,28 @@ class ClientResolver {
           fullPath,
           size: stats.size,
           updatedAt: stats.mtime.toISOString(),
-          isDocx: entry.name.endsWith(".docx"),
-          isPptx: entry.name.endsWith(".pptx"),
-          isMd: entry.name.endsWith(".md"),
-          isChecklist: entry.name.startsWith("psf-checklist-"),
+          isDocx: true,
         };
-      });
+      })
+      .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  }
+
+  // Remove unwanted non-docx files (.md, .pptx) from EXTERNAL to keep folder clean
+  cleanOutputs(clientName) {
+    const { outputDir } = this.getClientPaths(clientName);
+    if (!fs.existsSync(outputDir)) return [];
+    const removed = [];
+    const entries = fs.readdirSync(outputDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory() && !entry.name.endsWith(".docx") && !entry.name.startsWith(".")) {
+        const p = path.join(outputDir, entry.name);
+        try {
+          fs.unlinkSync(p);
+          removed.push(entry.name);
+        } catch (e) {}
+      }
+    }
+    return removed;
   }
 
   // Search across all clients matching query

@@ -821,7 +821,7 @@ function renderDashboardHTML() {
 
         <div class="action-row">
           <button class="btn btn-primary" id="btnGenerate" onclick="triggerGenerate()">
-            <span>⚡</span> Generate SOW Document (.docx + .md)
+            <span>⚡</span> Generate SOW Document (.docx)
           </button>
           <button class="btn btn-outline" id="btnValidate" onclick="triggerValidate()">
             <span>🔍</span> Audit Compliance Checklist
@@ -839,7 +839,12 @@ function renderDashboardHTML() {
             <span>📦</span>
             <span>Generated Deliverables in <code>EXTERNAL/</code></span>
           </div>
-          <span style="font-size:0.8rem; color:var(--muted);">Auto-synced to Google Drive online</span>
+          <div style="display:flex; align-items:center; gap:0.75rem;">
+            <button class="btn btn-outline" style="padding:0.3rem 0.65rem; font-size:0.75rem;" onclick="cleanExternalFiles()">
+              🧹 Clean Non-SOW Files
+            </button>
+            <span style="font-size:0.8rem; color:var(--muted);">Auto-synced to Google Drive</span>
+          </div>
         </div>
 
         <div class="files-grid" id="deliverablesGrid">
@@ -1161,21 +1166,14 @@ function renderDashboardHTML() {
       outputs.forEach(f => {
         const card = document.createElement('div');
         card.className = 'file-card';
-        
-        let icon = '📄';
-        let badgeText = 'Document';
-        if (f.isDocx) { icon = '📝'; badgeText = 'Google Docs Ready (.docx)'; }
-        if (f.isMd && !f.isChecklist) { icon = '🔄'; badgeText = 'Synced Parity (.md)'; }
-        if (f.isChecklist) { icon = '🛡️'; badgeText = 'Audit Checklist Report'; }
-
         const sizeKb = Math.round(f.size / 1024);
 
         card.innerHTML = 
           '<div class="file-header">' +
-            '<div class="file-icon">' + icon + '</div>' +
+            '<div class="file-icon">📝</div>' +
             '<div class="file-info">' +
               '<h3>' + f.name + '</h3>' +
-              '<p>' + sizeKb + ' KB  •  ' + badgeText + '</p>' +
+              '<p>' + sizeKb + ' KB  •  Official SOW (.docx)</p>' +
             '</div>' +
           '</div>' +
           '<div class="file-actions">' +
@@ -1185,6 +1183,15 @@ function renderDashboardHTML() {
 
         grid.appendChild(card);
       });
+    }
+
+    async function cleanExternalFiles() {
+      if (!currentClient) return;
+      if (!confirm('Clean EXTERNAL/ folder to remove extraneous non-SOW files (.md, old slides, etc.) and keep only .docx SOW?')) return;
+      const res = await fetch('/api/clean-outputs?client=' + encodeURIComponent(currentClient), { method: 'POST' });
+      const data = await res.json();
+      alert('Cleaned ' + (data.removed ? data.removed.length : 0) + ' extra files from EXTERNAL/. Folder is now pristine!');
+      selectClient(currentClient);
     }
 
     async function triggerGenerate() {
@@ -1211,7 +1218,14 @@ function renderDashboardHTML() {
         });
         const data = await res.json();
         if (data.success) {
-          alert('✅ ' + SPECS[currentProvider].name + ' SOW Document and Compliance Audit saved into AG_Client/' + currentClient + '/EXTERNAL/ !');
+          if (data.auditReport) {
+            document.getElementById('checklistSection').style.display = 'block';
+            document.getElementById('checklistLog').textContent = data.auditReport;
+            document.getElementById('scorecardPct').textContent = data.score + '%';
+            document.getElementById('scorecardTitle').textContent = SPECS[currentProvider].name + ' Audit: ' + data.status;
+            document.getElementById('scorecardSubtitle').textContent = 'Live compliance scorecard verified in-memory.';
+          }
+          alert('✅ ' + SPECS[currentProvider].name + ' SOW Document saved into AG_Client/' + currentClient + '/EXTERNAL/ !');
           selectClient(currentClient);
         } else {
           alert('❌ Generation error: ' + data.error);
@@ -1411,25 +1425,16 @@ const server = http.createServer(async (req, res) => {
         const docxPath = path.join(outputsDir, docxFileName);
         await sowBuilder.saveToFile(doc, docxPath);
 
-        // Markdown Parity Sync
-        const mdFileName = `sow-${safeClientName}-${provider}-${dateStr}.md`;
-        const mdPath = path.join(outputsDir, mdFileName);
-        await convertDocxToMarkdown(docxPath, { outputPath: mdPath });
-
-        // Hyperscaler Checklist Audit
-        const mdContent = fs.readFileSync(mdPath, "utf-8");
+        // Perform Validation Audit In-Memory (No cluttered .md files in EXTERNAL/)
+        const { markdown } = await convertDocxToMarkdown(docxPath);
         const validator = new SowValidator();
-        const validation = validator.validate(mdContent, {
+        const validation = validator.validate(markdown, {
           client,
           provider,
           project,
           partner: BRAND.name,
         });
-
         const auditReport = validator.generateReport(validation, { client, project, provider });
-        const auditFileName = `checklist-${safeClientName}-${provider}-${dateStr}.md`;
-        const auditPath = path.join(outputsDir, auditFileName);
-        fs.writeFileSync(auditPath, auditReport, "utf-8");
 
         res.writeHead(200, { "Content-Type": "application/json" });
         return res.end(
@@ -1438,7 +1443,7 @@ const server = http.createServer(async (req, res) => {
             score: validation.score,
             status: validation.status,
             docxFileName,
-            auditFileName,
+            auditReport,
           })
         );
       } catch (err) {
@@ -1519,6 +1524,18 @@ const server = http.createServer(async (req, res) => {
       return res.end(JSON.stringify({ success: true, name: safeName }));
     });
     return;
+  }
+
+  // API: Clean non-SOW files (.md, .pptx, audits) from EXTERNAL/
+  if (pathname === "/api/clean-outputs" && req.method === "POST") {
+    const client = parsedUrl.query.client;
+    if (!client) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "Missing client" }));
+    }
+    const removed = clientResolver.cleanOutputs(client);
+    res.writeHead(200, { "Content-Type": "application/json" });
+    return res.end(JSON.stringify({ success: true, removed }));
   }
 
   res.writeHead(404);

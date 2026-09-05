@@ -85,41 +85,27 @@ program
     await sowBuilder.saveToFile(doc, docxPath);
     console.log(`   ✅ SOW DOCX created: ${docxFileName}`);
 
-    // 2. Synchronize to Markdown for local parity
-    console.log(`\n🔄 Step 2: Synchronizing SOW to local Markdown representation...`);
-    const mdFileName = `sow-${safeClientName}-${provider}-${dateStr}.md`;
-    const mdPath = path.join(outputsDir, mdFileName);
-    await convertDocxToMarkdown(docxPath, { outputPath: mdPath });
-    console.log(`   ✅ Synced Markdown created: ${mdFileName}`);
-
-    // 3. Run Hyperscaler Checklist Audit
-    console.log(`\n🔍 Step 3: Auditing against ${spec.governingRules}...`);
-    const mdContent = fs.readFileSync(mdPath, "utf-8");
+    // 2. Perform In-Memory Hyperscaler Checklist Audit
+    console.log(`\n🔍 Step 2: Auditing in-memory against ${spec.governingRules}...`);
+    const { markdown } = await convertDocxToMarkdown(docxPath);
     const validator = new SowValidator();
-    const validation = validator.validate(mdContent, {
+    const validation = validator.validate(markdown, {
       client,
       provider,
       project,
       partner: BRAND.name,
     });
 
-    const auditReport = validator.generateReport(validation, { client, project, provider });
-    const auditFileName = `checklist-${safeClientName}-${provider}-${dateStr}.md`;
-    const auditPath = path.join(outputsDir, auditFileName);
-    fs.writeFileSync(auditPath, auditReport, "utf-8");
-
     console.log(`   ✅ Compliance Score: ${validation.score}% (${validation.passedCount}/${validation.totalCount} checks passed) — Status: ${validation.status}`);
-    console.log(`   ✅ Audit Report saved: ${auditFileName}`);
 
     console.log(`\n======================================================`);
-    console.log(`🎉 GENERATION COMPLETE & SYNC-READY!`);
+    console.log(`🎉 SOW GENERATION COMPLETE & SYNC-READY!`);
     console.log(`======================================================`);
-    console.log(`All files are located in:`);
-    console.log(`📂 ${outputsDir}`);
-    console.log(`\nCloud Sync Notes:`);
-    console.log(`1. Google Drive Desktop will automatically upload these files to Google Drive.`);
-    console.log(`2. Open '${docxFileName}' in Google Docs or Microsoft Word to review and share.`);
-    console.log(`3. Run 'node sow-cli.js watch --client ${client}' to monitor and auto-sync online edits back to local markdown.\n`);
+    console.log(`Generated Deliverable:`);
+    console.log(`📄 ${docxPath}`);
+    console.log(`\nCloud Notes:`);
+    console.log(`1. Google Drive Desktop will automatically upload '${docxFileName}' to Google Drive.`);
+    console.log(`2. Open in Google Docs or Microsoft Word to review, sign, and share with stakeholders.\n`);
   });
 
 // ==========================================
