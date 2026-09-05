@@ -745,11 +745,14 @@ function renderDashboardHTML() {
           </div>
         </div>
 
-        <!-- Detected Inputs in INTERNAL/ -->
-        <div style="margin-bottom:1rem;">
-          <div class="inputs-chip-row" id="inputsChipRow">
+        <!-- Detected Inputs in INTERNAL/ and Action Button -->
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem; flex-wrap:wrap; gap:0.5rem;">
+          <div class="inputs-chip-row" id="inputsChipRow" style="margin-bottom:0;">
             <span style="font-size:0.8rem; color:var(--muted);">No input files found in INTERNAL/ yet.</span>
           </div>
+          <button class="btn btn-outline" style="padding:0.45rem 0.9rem; font-size:0.8rem; font-weight:700;" onclick="triggerPrdAnalysis(true)">
+            <span>🔍</span> Analyze PRD & Context Notes
+          </button>
         </div>
 
         <!-- Gap Analyzer & Discovery Intelligence Card -->
@@ -999,10 +1002,12 @@ function renderDashboardHTML() {
       });
     }
 
-    // Trigger AI / Heuristic Discovery Analysis
-    async function triggerPrdAnalysis() {
+    // Trigger AI / Heuristic Discovery Analysis (Only when PRD document or commentary notes exist)
+    async function triggerPrdAnalysis(isManual = false) {
       if (!currentClient) return;
       const notes = document.getElementById('contextNotes').value;
+      const chipContainer = document.getElementById('workloadChips');
+      const gapEl = document.getElementById('gapAlerts');
       
       const res = await fetch('/api/analyze-prd', {
         method: 'POST',
@@ -1011,8 +1016,18 @@ function renderDashboardHTML() {
       });
       const data = await res.json();
 
-      // Render Workloads
-      const chipContainer = document.getElementById('workloadChips');
+      // If no readable input text is present, show clean waiting state!
+      if (!data.hasInputs) {
+        chipContainer.innerHTML = '';
+        gapEl.innerHTML = '<div style="font-size:0.85rem; color:var(--muted); padding:0.4rem 0;">📥 <strong>Awaiting Inputs:</strong> Drop a PRD document (.docx, .txt, .md, .pdf) into INTERNAL/ or type context in the comment box above, then click <em>Analyze PRD & Context Notes</em>.</div>';
+        document.getElementById('analyzerConfidence').textContent = 'Awaiting PRD or notes';
+        if (isManual) {
+          alert('Please upload a PRD file into INTERNAL/ or type context in the comment box first!');
+        }
+        return;
+      }
+
+      // Render Workloads actually found in the text
       chipContainer.innerHTML = '';
       data.workloads.forEach(w => {
         const c = document.createElement('span');
@@ -1025,16 +1040,15 @@ function renderDashboardHTML() {
       if (data.detectedProvider && data.detectedProvider !== currentProvider) {
         document.getElementById('analyzerConfidence').innerHTML = 
           'Recommended Cloud: <strong style="color:var(--primary); cursor:pointer;" onclick="setProvider(\\'' + data.detectedProvider + '\\')">' + 
-          SPECS[data.detectedProvider].name + ' (Switch)</strong>';
+          SPECS[data.detectedProvider].name + ' (Click to Switch)</strong>';
       } else {
-        document.getElementById('analyzerConfidence').textContent = data.totalSourceFiles + ' files in INTERNAL/ • ' + data.workloads.length + ' workloads mapped';
+        document.getElementById('analyzerConfidence').textContent = data.workloads.length + ' workloads mapped from discovery input';
       }
 
-      // Render Gaps
-      const gapEl = document.getElementById('gapAlerts');
+      // Render Gaps found in the text
       gapEl.innerHTML = '';
       if (data.gaps.length === 0) {
-        gapEl.innerHTML = '<div style="font-size:0.8rem; color:var(--success); font-weight:600;">✅ Discovery Complete: Sizing and core parameters detected!</div>';
+        gapEl.innerHTML = '<div style="font-size:0.8rem; color:var(--success); font-weight:600;">✅ Discovery Complete: Sizing and core parameters detected in your inputs!</div>';
       } else {
         data.gaps.forEach(g => {
           const div = document.createElement('div');

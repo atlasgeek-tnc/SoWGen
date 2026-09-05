@@ -6,7 +6,7 @@ class PrdAnalyzer {
   constructor() {}
 
   /**
-   * Extract text from a file (.md, .txt, .docx, or json)
+   * Extract readable text from an input file (.md, .txt, .docx, or json/pdf)
    */
   async extractFileText(filePath) {
     if (!fs.existsSync(filePath)) return "";
@@ -18,11 +18,30 @@ class PrdAnalyzer {
         return result.value || "";
       } else if (ext === ".md" || ext === ".txt" || ext === ".json" || ext === ".csv") {
         return fs.readFileSync(filePath, "utf-8");
-      } else {
-        // For other formats (like pdf), read as utf-8 or extract printable strings
+      } else if (ext === ".pdf") {
+        // Safe text extraction from PDF without binary stream garbage:
+        // Extract printable English words that are at least 3 characters long
         const buffer = fs.readFileSync(filePath);
-        // Extract basic ASCII strings if binary
-        return buffer.toString("utf-8").replace(/[^\x20-\x7E\t\n\r]/g, " ");
+        const str = buffer.toString("binary");
+        // Extract text blocks inside BT ... ET if present, or readable strings
+        const textBlocks = [];
+        const regex = /BT[\s\S]*?ET/g;
+        let match;
+        while ((match = regex.exec(str)) !== null) {
+          // Extract strings inside parentheses (Tj / TJ operators)
+          const strings = match[0].match(/\(([^)]+)\)/g);
+          if (strings) {
+            textBlocks.push(strings.map((s) => s.slice(1, -1)).join(" "));
+          }
+        }
+        if (textBlocks.length > 0) {
+          return textBlocks.join("\n");
+        }
+        // Fallback: extract continuous ASCII printable words of length >= 4
+        const words = str.match(/[A-Za-z0-9\s.,;:'"()/-]{4,}/g) || [];
+        return words.filter((w) => w.trim().length > 4).join(" ");
+      } else {
+        return "";
       }
     } catch (e) {
       console.warn(`Could not extract text from ${filePath}:`, e.message);
@@ -41,8 +60,8 @@ class PrdAnalyzer {
 
     for (const fp of filePaths) {
       const text = await this.extractFileText(fp);
-      if (text) {
-        combinedText += `\n--- SOURCE FILE: ${path.basename(fp)} ---\n` + text;
+      if (text && text.trim().length > 20) {
+        combinedText += `\n--- SOURCE FILE: ${path.basename(fp)} ---\n` + text.trim();
       }
     }
 
@@ -50,14 +69,32 @@ class PrdAnalyzer {
       combinedText += `\n--- USER CONTEXT NOTES ---\n` + userNotes.trim();
     }
 
-    const norm = combinedText.toLowerCase();
+    const cleanText = combinedText.trim();
 
-    // 1. Detect Hyperscaler Preference if present
+    // CRITICAL: If there is no real input text (no PRD and no commentary), return clean empty state!
+    // Do NOT invent workloads or ask gap questions when there is no text to analyze.
+    if (cleanText.length < 30) {
+      return {
+        hasInputs: false,
+        totalSourceFiles: filePaths.length,
+        detectedProvider: null,
+        providerConfidence: "none",
+        workloads: [],
+        gaps: [],
+        missingCount: 0,
+        synthesizedSummary: "",
+        rawTextSnippet: "",
+      };
+    }
+
+    const norm = cleanText.toLowerCase();
+
+    // 1. Detect Hyperscaler Preference using strict word boundaries
     let detectedProvider = null;
     let providerConfidence = "neutral";
-    const googleMentions = (norm.match(/google cloud|gcp|bigquery|gke|cloud sql|vertex|psf|daf/g) || []).length;
-    const awsMentions = (norm.match(/aws|amazon web services|ec2|s3|rds|eks|map 2\.0|lambda/g) || []).length;
-    const azureMentions = (norm.match(/azure|microsoft cloud|entra|aks|cosmos|ammp|caf/g) || []).length;
+    const googleMentions = (norm.match(/\b(google cloud|gcp|bigquery|gke|cloud sql|vertex ai|vertex|google psf|google daf)\b/g) || []).length;
+    const awsMentions = (norm.match(/\b(aws|amazon web services|ec2|s3|rds|eks|map 2\.0|aws lambda|aws aurora)\b/g) || []).length;
+    const azureMentions = (norm.match(/\b(azure|microsoft cloud|microsoft entra|entra id|azure ad|aks|cosmos db|azure ammp)\b/g) || []).length;
 
     if (googleMentions > awsMentions && googleMentions > azureMentions && googleMentions >= 2) {
       detectedProvider = "google";
@@ -70,99 +107,91 @@ class PrdAnalyzer {
       providerConfidence = `High (Azure mentions: ${azureMentions})`;
     }
 
-    // 2. Extract Key Workloads & Components
+    // 2. Extract Key Workloads from the actual text
     const workloads = [];
-    if (/kubernetes|gke|eks|aks|container|docker/i.test(combinedText)) {
+    if (/\b(kubernetes|gke|eks|aks|container|docker|microservice|microservices)\b/i.test(cleanText)) {
       workloads.push({ name: "Container Orchestration / Kubernetes", type: "Compute", icon: "☸️" });
     }
-    if (/database|postgres|mysql|sql server|oracle|rds|cloud sql/i.test(combinedText)) {
+    if (/\b(database|postgres|postgresql|mysql|sql server|oracle|rds|cloud sql|aurora)\b/i.test(cleanText)) {
       workloads.push({ name: "Relational Database Migration & Managed SQL", type: "Database", icon: "🗄️" });
     }
-    if (/bigquery|redshift|snowflake|data warehouse|etl|pipeline|analytics/i.test(combinedText)) {
+    if (/\b(bigquery|redshift|snowflake|data warehouse|etl|pipeline|analytics|data lake)\b/i.test(cleanText)) {
       workloads.push({ name: "Modern Data Platform & Analytics", type: "Data", icon: "📊" });
     }
-    if (/terraform|infrastructure as code|iac|landing zone/i.test(combinedText)) {
+    if (/\b(terraform|infrastructure as code|iac|landing zone|control tower)\b/i.test(cleanText)) {
       workloads.push({ name: "Terraform Infrastructure as Code (IaC) & Landing Zone", type: "DevOps", icon: "🏗️" });
     }
-    if (/ci\/cd|github actions|gitlab|jenkins|devops/i.test(combinedText)) {
+    if (/\b(ci\/cd|github actions|gitlab|jenkins|devops|continuous deployment)\b/i.test(cleanText)) {
       workloads.push({ name: "Automated CI/CD Deployment Pipelines", type: "DevOps", icon: "🚀" });
     }
-    if (/ai|llm|machine learning|vertex|rag|bedrock/i.test(combinedText)) {
+    if (/\b(ai|llm|machine learning|genai|vertex|rag|bedrock|openai|model)\b/i.test(cleanText)) {
       workloads.push({ name: "GenAI & Foundation Model Integration", type: "AI/ML", icon: "🤖" });
     }
-    if (/security|iam|vpn|vpc|firewall|waf|compliance/i.test(combinedText)) {
+    if (/\b(security|iam|vpn|vpc|firewall|waf|compliance|zero-trust|hipaa|soc2)\b/i.test(cleanText)) {
       workloads.push({ name: "Zero-Trust Cloud Security, Networking & IAM", type: "Security", icon: "🛡️" });
     }
 
-    // Default workload if none detected
-    if (workloads.length === 0) {
-      workloads.push({ name: "Cloud Infrastructure Modernization & Migration", type: "Core", icon: "☁️" });
-    }
-
-    // 3. Gap Detection & Clarifying Questions
+    // 3. Gap Detection & Targeted Clarifying Questions (Only for missing items from this text)
     const gaps = [];
 
-    // Check Sizing & Inventory
-    const hasSizing = /(vcpus|ram|gb|tb|instances|cores|nodes|tps|rps|\d+\s*(vm|vms|servers|nodes))/i.test(combinedText);
+    // Check Sizing & Sizing details
+    const hasSizing = /\b(vcpus|ram|gb|tb|instances|cores|nodes|tps|rps|\d+\s*(vm|vms|servers|nodes|instances))\b/i.test(cleanText);
     if (!hasSizing) {
       gaps.push({
         id: "WORKLOAD_SIZING",
         category: "Architecture & Sizing",
         severity: "medium",
-        question: "What is the approximate size/scale of the in-scope workloads (e.g., number of VMs/servers, database sizes in GB/TB, or traffic throughput)?",
-        hint: "Example: 4 application VMs (16 vCPU, 64GB RAM), 1 managed PostgreSQL DB (500GB storage).",
+        question: "What is the approximate size/scale of the in-scope workloads (e.g. number of VMs/servers, database sizes in GB/TB, or traffic throughput)?",
+        hint: "Workload Sizing: 4 application VMs (16 vCPU, 64GB RAM), 1 managed PostgreSQL DB (500GB storage).",
       });
     }
 
     // Check Target Region
-    const hasRegion = /(us-central|us-east|us-west|ap-south|eu-west|region|mumbai|singapore|virginia)/i.test(combinedText);
+    const hasRegion = /\b(us-central|us-east|us-west|ap-south|eu-west|region|mumbai|singapore|virginia|frankfurt)\b/i.test(cleanText);
     if (!hasRegion) {
       gaps.push({
         id: "TARGET_REGION",
         category: "Cloud Governance",
         severity: "low",
         question: "Which primary cloud region(s) should be targeted for deployment and data residency?",
-        hint: "Example: us-central1 (Iowa) or ap-south-1 (Mumbai).",
+        hint: "Target Region: us-central1 (Iowa) or ap-south-1 (Mumbai).",
       });
     }
 
-    // Check Cutover Downtime / RTO
-    const hasCutover = /(cutover|downtime|rto|rpo|maintenance window|business hours)/i.test(combinedText);
+    // Check Cutover Downtime / Maintenance Window
+    const hasCutover = /\b(cutover|downtime|rto|rpo|maintenance window|business hours|blue\/green)\b/i.test(cleanText);
     if (!hasCutover) {
       gaps.push({
         id: "CUTOVER_WINDOW",
         category: "Migration Execution",
         severity: "low",
         question: "Is there an acceptable maintenance downtime window for production cutover, or is zero-downtime required?",
-        hint: "Example: Weekend 4-hour maintenance window or zero-downtime blue/green cutover.",
+        hint: "Cutover Window: Weekend 4-hour maintenance window or zero-downtime blue/green cutover.",
       });
     }
 
     // Check Source Environment
-    const hasSource = /(on-prem|aws|azure|gcp|vmware|bare metal|digitalocean|heroku|co-lo)/i.test(combinedText);
+    const hasSource = /\b(on-prem|on-premise|vmware|bare metal|digitalocean|heroku|co-lo|source aws|source azure|source gcp)\b/i.test(cleanText);
     if (!hasSource) {
       gaps.push({
         id: "SOURCE_ENVIRONMENT",
         category: "Prerequisites",
         severity: "medium",
-        question: "Where are the existing workloads hosted today (e.g., on-premises VMware, AWS, Azure, Bare Metal)?",
-        hint: "Example: Self-hosted on AWS EC2 or On-Premise VMware vSphere cluster.",
+        question: "Where are the existing workloads hosted today (e.g. on-premises VMware, AWS, Bare Metal)?",
+        hint: "Source Environment: Self-hosted on AWS EC2 or On-Premise VMware vSphere cluster.",
       });
     }
 
-    // 4. Synthesize Executive Summary snippet
+    // 4. Synthesize Summary snippet
     let synthesizedSummary = "";
-    if (combinedText.trim().length > 50) {
-      // Find sentences discussing business goals or scope
-      const lines = combinedText
-        .split(/[\n\r]+/)
-        .map((l) => l.trim())
-        .filter((l) => l.length > 20 && !l.startsWith("#") && !l.startsWith("---"));
-      synthesizedSummary = lines.slice(0, 3).join(" ");
-    }
+    const lines = cleanText
+      .split(/[\n\r]+/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 20 && !l.startsWith("#") && !l.startsWith("---"));
+    synthesizedSummary = lines.slice(0, 3).join(" ");
 
     return {
-      hasInputs: combinedText.trim().length > 0,
+      hasInputs: true,
       totalSourceFiles: filePaths.length,
       detectedProvider,
       providerConfidence,
@@ -170,7 +199,7 @@ class PrdAnalyzer {
       gaps,
       missingCount: gaps.length,
       synthesizedSummary,
-      rawTextSnippet: combinedText.slice(0, 500),
+      rawTextSnippet: cleanText.slice(0, 500),
     };
   }
 }
