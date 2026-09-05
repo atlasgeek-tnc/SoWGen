@@ -160,29 +160,54 @@ class SowBuilder {
   createCallout(title, text, isAccent = false) {
     const borderColor = isAccent ? BRAND.colors.accent : BRAND.colors.primary;
     const bgColor = isAccent ? BRAND.colors.accentLight : BRAND.colors.primaryLight;
+    const CALLOUT_WIDTH = 9400;
 
-    return new Paragraph({
-      alignment: AlignmentType.JUSTIFIED,
-      spacing: { before: 180, after: 180, line: 276 },
-      border: {
-        left: { style: BorderStyle.SINGLE, size: 24, color: borderColor, space: 16 },
-      },
-      shading: { fill: bgColor, type: ShadingType.CLEAR },
-      indent: { left: 240, right: 240 },
-      children: [
-        new TextRun({
-          text: title,
-          bold: true,
-          size: 20,
-          color: BRAND.colors.dark,
-          font: BRAND.fonts.primary,
-        }),
-        new TextRun({ break: 1 }),
-        new TextRun({
-          text,
-          size: 19,
-          color: BRAND.colors.body,
-          font: BRAND.fonts.primary,
+    return new Table({
+      width: { size: CALLOUT_WIDTH, type: WidthType.DXA },
+      columnWidths: [CALLOUT_WIDTH],
+      rows: [
+        new TableRow({
+          cantSplit: true,
+          children: [
+            new TableCell({
+              width: { size: CALLOUT_WIDTH, type: WidthType.DXA },
+              borders: {
+                left: { style: BorderStyle.SINGLE, size: 24, color: borderColor },
+                top: { style: BorderStyle.NONE },
+                right: { style: BorderStyle.NONE },
+                bottom: { style: BorderStyle.NONE },
+              },
+              shading: { fill: bgColor, type: ShadingType.CLEAR },
+              margins: { top: 160, bottom: 160, left: 220, right: 220 },
+              verticalAlign: VerticalAlign.CENTER,
+              children: [
+                new Paragraph({
+                  spacing: { before: 0, after: 80 },
+                  children: [
+                    new TextRun({
+                      text: title,
+                      bold: true,
+                      size: 20,
+                      color: BRAND.colors.dark,
+                      font: BRAND.fonts.primary,
+                    }),
+                  ],
+                }),
+                new Paragraph({
+                  alignment: AlignmentType.JUSTIFIED,
+                  spacing: { before: 0, after: 0, line: 260 },
+                  children: [
+                    new TextRun({
+                      text,
+                      size: 19,
+                      color: BRAND.colors.body,
+                      font: BRAND.fonts.primary,
+                    }),
+                  ],
+                }),
+              ],
+            }),
+          ],
         }),
       ],
     });
@@ -347,20 +372,8 @@ class SowBuilder {
             font: BRAND.fonts.primary,
           }),
         ],
-      })
-    );
-
-    if (logoRun) {
-      docChildren.push(
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 300, after: 300 },
-          children: [logoRun],
-        })
-      );
-    }
-
-    docChildren.push(
+      }),
+      new Paragraph({ spacing: { before: 200, after: 120 }, children: [] }),
       this.createCallout(
         `Commercial & Governance Framework (${spec.name})`,
         provider === "google"
@@ -368,6 +381,7 @@ class SowBuilder {
           : `This Statement of Work is executed between Atlas Geek and ${clientName}, establishing fixed-scope deliverable milestones aligned with ${spec.name} architecture and deployment best practices.`,
         true
       ),
+      new Paragraph({ spacing: { before: 120, after: 0 }, children: [] }),
       new Paragraph({ children: [new PageBreak()] })
     );
 
@@ -525,10 +539,12 @@ class SowBuilder {
           : "All estimated start dates and milestones are projected to commence upon mutual execution of this Statement of Work."
       ),
       this.createTable(timelineTable[0], timelineTable.slice(1), [2600, 1800, 2300, 2300]),
+      new Paragraph({ spacing: { before: 100, after: 80 }, children: [] }),
       this.createCallout(
         "Project Term Provision",
         "The Term of this SOW shall commence on the Effective Date and shall continue until all project milestones are completed and all deliverables have achieved formal Customer sign-off ('pending acceptance of all deliverables')."
-      )
+      ),
+      new Paragraph({ spacing: { before: 80, after: 60 }, children: [] })
     );
 
     // --- SECTION 6: ROLES, RACI & GOVERNANCE ---
@@ -686,6 +702,7 @@ class SowBuilder {
         milestoneRows,
         [2800, 3600, 1200, 1800]
       ),
+      new Paragraph({ spacing: { before: 100, after: 80 }, children: [] }),
       this.createCallout(
         "Payment Terms & PSF Conditionality Provision",
         provider === "google"
@@ -693,6 +710,7 @@ class SowBuilder {
           : `Invoices shall be rendered upon completion and formal customer sign-off of each milestone deliverable. All invoices are payable net thirty (30) days from receipt. Services shall be delivered remotely, with virtual workshops and video-conferencing coordination.`,
         false
       ),
+      new Paragraph({ spacing: { before: 80, after: 60 }, children: [] }),
       this.createSubHeading("9.2 Invoices Sent To"),
       this.createTable(
         ["Contact Attribute", "Specification"],
@@ -806,21 +824,91 @@ class SowBuilder {
     );
 
     // --- HEADER AND FOOTER ---
-    const docHeader = new Header({
-      children: [
+    let headerLogoRun = null;
+    if (fs.existsSync(BRAND.logoPath)) {
+      const logoBuffer = fs.readFileSync(BRAND.logoPath);
+      headerLogoRun = new ImageRun({
+        data: logoBuffer,
+        transformation: { width: 90, height: 59 },
+      });
+    }
+
+    const headerChildren = [];
+    if (headerLogoRun) {
+      headerChildren.push(
+        new Table({
+          width: { size: 9400, type: WidthType.DXA },
+          columnWidths: [3000, 6400],
+          borders: {
+            top: { style: BorderStyle.NONE },
+            bottom: { style: BorderStyle.NONE },
+            left: { style: BorderStyle.NONE },
+            right: { style: BorderStyle.NONE },
+          },
+          rows: [
+            new TableRow({
+              children: [
+                new TableCell({
+                  width: { size: 3000, type: WidthType.DXA },
+                  borders: {
+                    top: { style: BorderStyle.NONE },
+                    bottom: { style: BorderStyle.NONE },
+                    left: { style: BorderStyle.NONE },
+                    right: { style: BorderStyle.NONE },
+                  },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [
+                    new Paragraph({
+                      alignment: AlignmentType.LEFT,
+                      children: [headerLogoRun],
+                    }),
+                  ],
+                }),
+                new TableCell({
+                  width: { size: 6400, type: WidthType.DXA },
+                  borders: {
+                    top: { style: BorderStyle.NONE },
+                    bottom: { style: BorderStyle.NONE },
+                    left: { style: BorderStyle.NONE },
+                    right: { style: BorderStyle.NONE },
+                  },
+                  verticalAlign: VerticalAlign.CENTER,
+                  children: [
+                    new Paragraph({
+                      alignment: AlignmentType.RIGHT,
+                      children: [
+                        new TextRun({
+                          text: `Statement of Work — ${clientName} (${spec.name})`,
+                          size: 16,
+                          color: BRAND.colors.muted,
+                          font: BRAND.fonts.primary,
+                        }),
+                      ],
+                    }),
+                  ],
+                }),
+              ],
+            }),
+          ],
+        })
+      );
+    } else {
+      headerChildren.push(
         new Paragraph({
           alignment: AlignmentType.RIGHT,
           children: [
             new TextRun({
-              text: `${BRAND.name} | Statement of Work — ${clientName} (${spec.name})`,
+              text: `Statement of Work — ${clientName} (${spec.name})`,
               size: 16,
               color: BRAND.colors.muted,
               font: BRAND.fonts.primary,
             }),
           ],
-        }),
-      ],
-    });
+        })
+      );
+    }
+
+    const docHeader = new Header({ children: headerChildren });
 
     const docFooter = new Footer({
       children: [
@@ -828,7 +916,7 @@ class SowBuilder {
           alignment: AlignmentType.CENTER,
           children: [
             new TextRun({
-              text: `Confidential — ${BRAND.name} (${BRAND.website}) | Page `,
+              text: `${BRAND.legalName} | Page `,
               size: 16,
               color: BRAND.colors.muted,
               font: BRAND.fonts.primary,
