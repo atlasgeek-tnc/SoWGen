@@ -141,13 +141,16 @@ class SowBuilder {
   createCallout(title, text, isAccent = false) {
     const borderColor = isAccent ? BRAND.colors.accent : BRAND.colors.primary;
     const bgColor = isAccent ? BRAND.colors.accentLight : BRAND.colors.primaryLight;
+    const CALLOUT_WIDTH = 9000;
 
     return new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
+      width: { size: CALLOUT_WIDTH, type: WidthType.DXA },
+      columnWidths: [CALLOUT_WIDTH],
       rows: [
         new TableRow({
           children: [
             new TableCell({
+              width: { size: CALLOUT_WIDTH, type: WidthType.DXA },
               borders: {
                 left: { style: BorderStyle.SINGLE, size: 24, color: borderColor },
                 top: { style: BorderStyle.NONE },
@@ -155,10 +158,10 @@ class SowBuilder {
                 bottom: { style: BorderStyle.NONE },
               },
               shading: { fill: bgColor, type: ShadingType.CLEAR },
-              margins: { top: 120, bottom: 120, left: 160, right: 160 },
+              margins: { top: 140, bottom: 140, left: 180, right: 180 },
               children: [
                 new Paragraph({
-                  spacing: { before: 0, after: 40 },
+                  spacing: { before: 0, after: 60 },
                   children: [
                     new TextRun({
                       text: title,
@@ -191,11 +194,21 @@ class SowBuilder {
   createTable(headers, rows, widths = []) {
     const border = { style: BorderStyle.SINGLE, size: 2, color: BRAND.colors.border };
     const allBorders = { top: border, bottom: border, left: border, right: border };
-    const cellMargins = { top: 100, bottom: 100, left: 120, right: 120 };
+    const cellMargins = { top: 120, bottom: 120, left: 140, right: 140 };
+
+    const TARGET_TABLE_WIDTH = 9400;
+
+    let computedWidths = widths;
+    if (!computedWidths || computedWidths.length !== headers.length) {
+      const defaultColWidth = Math.floor(TARGET_TABLE_WIDTH / headers.length);
+      computedWidths = headers.map(() => defaultColWidth);
+    }
+
+    const totalWidth = computedWidths.reduce((acc, w) => acc + w, 0);
 
     const headerCells = headers.map((h, i) => {
       return new TableCell({
-        width: widths[i] ? { size: widths[i], type: WidthType.DXA } : undefined,
+        width: { size: computedWidths[i], type: WidthType.DXA },
         borders: allBorders,
         shading: { fill: BRAND.colors.primary, type: ShadingType.CLEAR },
         margins: cellMargins,
@@ -220,8 +233,9 @@ class SowBuilder {
       const isAlt = rowIndex % 2 === 1;
       const fill = isAlt ? BRAND.colors.lightBg : BRAND.colors.white;
       const cells = r.map((c, colIndex) => {
+        const colWidth = computedWidths[colIndex] || Math.floor(TARGET_TABLE_WIDTH / r.length);
         return new TableCell({
-          width: widths[colIndex] ? { size: widths[colIndex], type: WidthType.DXA } : undefined,
+          width: { size: colWidth, type: WidthType.DXA },
           borders: allBorders,
           shading: { fill, type: ShadingType.CLEAR },
           margins: cellMargins,
@@ -240,12 +254,16 @@ class SowBuilder {
           ],
         });
       });
-      return new TableRow({ children: cells });
+      return new TableRow({ cantSplit: true, children: cells });
     });
 
     return new Table({
-      width: { size: 100, type: WidthType.PERCENTAGE },
-      rows: [new TableRow({ children: headerCells }), ...bodyRows],
+      width: { size: totalWidth, type: WidthType.DXA },
+      columnWidths: computedWidths,
+      rows: [
+        new TableRow({ tableHeader: true, cantSplit: true, children: headerCells }),
+        ...bodyRows,
+      ],
     });
   }
 
