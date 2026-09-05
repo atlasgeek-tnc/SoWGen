@@ -1356,7 +1356,7 @@ const server = http.createServer(async (req, res) => {
         });
 
         const safeClientName = client.toLowerCase().replace(/[\s_-]+/g, "_");
-        const docxFileName = `sow-${safeClientName}-${provider}-${dateStr}.docx`;
+        const docxFileName = `sow-${safeClientName}.docx`;
         const docxPath = path.join(outputsDir, docxFileName);
         await sowBuilder.saveToFile(doc, docxPath);
 

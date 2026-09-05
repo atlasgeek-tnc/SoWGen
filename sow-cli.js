@@ -80,7 +80,7 @@ program
     });
 
     const safeClientName = client.toLowerCase().replace(/[\s_-]+/g, "_");
-    const docxFileName = `sow-${safeClientName}-${provider}-${dateStr}.docx`;
+    const docxFileName = `sow-${safeClientName}.docx`;
     const docxPath = path.join(outputsDir, docxFileName);
     await sowBuilder.saveToFile(doc, docxPath);
     console.log(`   ✅ SOW DOCX created: ${docxFileName}`);
