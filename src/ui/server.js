@@ -224,40 +224,7 @@ function renderDashboardHTML() {
       color: #FFFFFF;
       font-weight: 600;
     }
-    .btn-see-more {
-      background: #F8FAFC;
-      border: 1px solid var(--border);
-      color: var(--primary);
-      padding: 0.5rem;
-      border-radius: 0.4rem;
-      font-size: 0.8rem;
-      font-weight: 600;
-      cursor: pointer;
-      width: 100%;
-      text-align: center;
-      transition: all 0.15s;
-    }
-    .btn-see-more:hover {
-      background: #EEF2FF;
-      border-color: #C7D2FE;
-    }
-    .btn-new-client {
-      background: #FFFFFF;
-      border: 1px dashed #CBD5E1;
-      color: var(--primary);
-      padding: 0.6rem;
-      border-radius: 0.4rem;
-      font-size: 0.85rem;
-      font-weight: 600;
-      cursor: pointer;
-      width: 100%;
-      text-align: center;
-      transition: all 0.15s;
-    }
-    .btn-new-client:hover {
-      background: #EEF2FF;
-      border-color: var(--primary);
-    }
+
 
     /* Content Area */
     main {
@@ -700,11 +667,11 @@ function renderDashboardHTML() {
   </header>
 
   <div class="main-container">
-    <!-- Sidebar: Search + Top 5 Recent + See More -->
+    <!-- Sidebar: Search + 5 Recent Clients -->
     <aside>
       <div class="sidebar-header">
-        <h2>Recent Engagements</h2>
-        <span id="clientCount" style="font-size:0.75rem; font-weight:700; color:var(--primary);">0 Total</span>
+        <h2>Engagements</h2>
+        <span id="clientCount" style="font-size:0.75rem; font-weight:700; color:var(--primary);">59+ Clients</span>
       </div>
       <div class="search-box">
         <span class="search-icon">🔍</span>
@@ -712,8 +679,6 @@ function renderDashboardHTML() {
       </div>
       <div class="client-list-label" id="listModeLabel">5 Most Recent</div>
       <ul class="client-list" id="clientList"></ul>
-      <button class="btn-see-more" id="btnSeeMore" onclick="loadMoreRecentClients()">+ See More (+5)</button>
-      <button class="btn-new-client" onclick="promptNewClient()">+ New Engagement Folder</button>
     </aside>
 
     <!-- Main Workspace -->
@@ -893,31 +858,15 @@ function renderDashboardHTML() {
       setProvider('google');
     }
 
-    // Load recent clients with paging
-    async function loadRecentClients(append = false) {
-      if (!append) {
-        recentOffset = 0;
-        recentClientsList = [];
-      }
-      const res = await fetch('/api/clients?recent=true&limit=' + RECENT_LIMIT + '&offset=' + recentOffset);
+    // Load top 5 recent clients
+    async function loadRecentClients() {
+      const res = await fetch('/api/clients?recent=true&limit=5');
       const data = await res.json();
       
       document.getElementById('clientCount').textContent = data.total + ' Total';
-      
-      if (append) {
-        recentClientsList = recentClientsList.concat(data.clients);
-      } else {
-        recentClientsList = data.clients;
-      }
-      recentOffset += data.clients.length;
-
-      document.getElementById('btnSeeMore').style.display = data.hasMore ? 'block' : 'none';
-      document.getElementById('listModeLabel').textContent = recentClientsList.length + ' Most Recent';
+      recentClientsList = data.clients || [];
+      document.getElementById('listModeLabel').textContent = '5 Most Recent';
       renderClients(recentClientsList);
-    }
-
-    async function loadMoreRecentClients() {
-      await loadRecentClients(true);
     }
 
     // Client search handler
@@ -925,14 +874,12 @@ function renderDashboardHTML() {
       const q = document.getElementById('clientSearch').value.trim();
       if (!q) {
         isSearchActive = false;
-        document.getElementById('btnSeeMore').style.display = 'block';
-        document.getElementById('listModeLabel').textContent = recentClientsList.length + ' Most Recent';
+        document.getElementById('listModeLabel').textContent = '5 Most Recent';
         renderClients(recentClientsList);
         return;
       }
 
       isSearchActive = true;
-      document.getElementById('btnSeeMore').style.display = 'none';
       document.getElementById('listModeLabel').textContent = 'Search Results';
       
       const res = await fetch('/api/clients?search=' + encodeURIComponent(q));
@@ -1268,18 +1215,6 @@ function renderDashboardHTML() {
       fetch('/api/open-file?client=' + encodeURIComponent(currentClient) + '&file=' + encodeURIComponent(fileName));
     }
 
-    async function promptNewClient() {
-      const name = prompt('Enter new engagement / client folder name (e.g. Acme Cloud Corp):');
-      if (!name || !name.trim()) return;
-      await fetch('/api/new-client', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim() }),
-      });
-      await loadRecentClients(false);
-      selectClient(name.trim());
-    }
-
     window.onload = init;
   </script>
 </body>
@@ -1507,23 +1442,6 @@ const server = http.createServer(async (req, res) => {
     exec(`open "${filePath}"`);
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify({ success: true }));
-  }
-
-  // API: Create new client folder inside AG_Client
-  if (pathname === "/api/new-client" && req.method === "POST") {
-    let body = "";
-    req.on("data", (chunk) => (body += chunk));
-    req.on("end", () => {
-      const { name } = JSON.parse(body);
-      const safeName = name.trim();
-      const baseDir = clientResolver.getBaseDir();
-      const clientDir = path.join(baseDir, safeName);
-      fs.mkdirSync(path.join(clientDir, "INTERNAL"), { recursive: true });
-      fs.mkdirSync(path.join(clientDir, "EXTERNAL"), { recursive: true });
-      res.writeHead(200, { "Content-Type": "application/json" });
-      return res.end(JSON.stringify({ success: true, name: safeName }));
-    });
-    return;
   }
 
   // API: Clean non-SOW files (.md, .pptx, audits) from EXTERNAL/
