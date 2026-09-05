@@ -17,6 +17,7 @@ const {
   Header,
   Footer,
   ImageRun,
+  PageNumber,
 } = require("docx");
 
 const BRAND = require("../templates/brand-theme");
@@ -157,51 +158,28 @@ class SowBuilder {
   createCallout(title, text, isAccent = false) {
     const borderColor = isAccent ? BRAND.colors.accent : BRAND.colors.primary;
     const bgColor = isAccent ? BRAND.colors.accentLight : BRAND.colors.primaryLight;
-    const CALLOUT_WIDTH = 9000;
 
-    return new Table({
-      width: { size: CALLOUT_WIDTH, type: WidthType.DXA },
-      columnWidths: [CALLOUT_WIDTH],
-      rows: [
-        new TableRow({
-          children: [
-            new TableCell({
-              width: { size: CALLOUT_WIDTH, type: WidthType.DXA },
-              borders: {
-                left: { style: BorderStyle.SINGLE, size: 24, color: borderColor },
-                top: { style: BorderStyle.NONE },
-                right: { style: BorderStyle.NONE },
-                bottom: { style: BorderStyle.NONE },
-              },
-              shading: { fill: bgColor, type: ShadingType.CLEAR },
-              margins: { top: 140, bottom: 140, left: 180, right: 180 },
-              children: [
-                new Paragraph({
-                  spacing: { before: 0, after: 60 },
-                  children: [
-                    new TextRun({
-                      text: title,
-                      bold: true,
-                      size: 20,
-                      color: BRAND.colors.dark,
-                      font: BRAND.fonts.primary,
-                    }),
-                  ],
-                }),
-                new Paragraph({
-                  spacing: { before: 0, after: 0 },
-                  children: [
-                    new TextRun({
-                      text,
-                      size: 18,
-                      color: BRAND.colors.body,
-                      font: BRAND.fonts.primary,
-                    }),
-                  ],
-                }),
-              ],
-            }),
-          ],
+    return new Paragraph({
+      spacing: { before: 180, after: 180 },
+      border: {
+        left: { style: BorderStyle.SINGLE, size: 24, color: borderColor, space: 16 },
+      },
+      shading: { fill: bgColor, type: ShadingType.CLEAR },
+      indent: { left: 240, right: 240 },
+      children: [
+        new TextRun({
+          text: title,
+          bold: true,
+          size: 20,
+          color: BRAND.colors.dark,
+          font: BRAND.fonts.primary,
+        }),
+        new TextRun({ break: 1 }),
+        new TextRun({
+          text,
+          size: 18,
+          color: BRAND.colors.body,
+          font: BRAND.fonts.primary,
         }),
       ],
     });
@@ -697,7 +675,19 @@ class SowBuilder {
               font: BRAND.fonts.primary,
             }),
             new TextRun({
-              children: ["PAGE_NUMBER"],
+              children: [PageNumber.CURRENT],
+              size: 16,
+              color: BRAND.colors.muted,
+              font: BRAND.fonts.primary,
+            }),
+            new TextRun({
+              text: " of ",
+              size: 16,
+              color: BRAND.colors.muted,
+              font: BRAND.fonts.primary,
+            }),
+            new TextRun({
+              children: [PageNumber.TOTAL_PAGES],
               size: 16,
               color: BRAND.colors.muted,
               font: BRAND.fonts.primary,
