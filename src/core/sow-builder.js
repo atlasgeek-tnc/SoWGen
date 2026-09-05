@@ -407,7 +407,7 @@ class SowBuilder {
     );
 
     // --- SECTION 4: ACTIVITIES & DELIVERABLES ---
-    const deliverablesTable = [
+    const deliverablesTable = data.deliverablesTable || [
       ["Phase / Milestone", "Work Activities & Scope", "Concrete Deliverables", "Acceptance Criteria"],
       [
         "Phase 1: Discovery & Architecture",
@@ -451,7 +451,7 @@ class SowBuilder {
     );
 
     // --- SECTION 5: PROJECT SCHEDULE & MILESTONES ---
-    const timelineTable = [
+    const timelineTable = data.timelineTable || [
       ["Phase", "Estimated Duration", "Target Start Window", "Target Completion Window"],
       [
         "Phase 1: Discovery & Architecture",
@@ -480,7 +480,7 @@ class SowBuilder {
 
     // --- SECTION 6: ROLES, RACI & GOVERNANCE ---
     const hyperscalerLabel = spec.name;
-    const raciTable = [
+    const raciTable = data.raciTable || [
       ["Project Activity", "Customer", "Atlas Geek (Partner)", hyperscalerLabel],
       [
         "SOW Execution & Program Approval",
@@ -512,32 +512,36 @@ class SowBuilder {
     );
 
     // --- SECTION 7: ASSUMPTIONS, DEPENDENCIES & RISKS ---
+    const prereqList = data.prerequisites || [
+      `Customer will provide timely access to ${spec.name} accounts/organizations, projects/subscriptions, IAM permissions, and source repositories within 5 business days of kickoff.`,
+      "Customer will assign a dedicated Product Owner / Technical Lead with authority to approve architectural decisions and milestone sign-offs within 3 business days.",
+      "Customer retains responsibility for network connectivity, third-party vendor agreements, and data residency compliance.",
+      "Partner will not introduce or utilize any third-party tools or SaaS solutions without explicit prior written consent from Customer.",
+    ];
+
     docChildren.push(
       this.createSectionHeading("7. Assumptions, Dependencies & Risks"),
       this.createSubHeading("7.1 Client Prerequisites & Dependencies"),
-      this.createBullet(
-        `Customer will provide timely access to ${spec.name} accounts/organizations, projects/subscriptions, IAM permissions, and source repositories within 5 business days of kickoff.`
-      ),
-      this.createBullet(
-        "Customer will assign a dedicated Product Owner / Technical Lead with authority to approve architectural decisions and milestone sign-offs within 3 business days."
-      ),
-      this.createBullet("Customer retains responsibility for network connectivity, third-party vendor agreements, and data residency compliance."),
-      this.createBullet("Partner will not introduce or utilize any third-party tools or SaaS solutions without explicit prior written consent from Customer."),
+      ...prereqList.map((p) => this.createBullet(p)),
       this.createSubHeading("7.2 Risk Management & Mitigation"),
       this.createBullet("Scope Creep: Any changes to agreed deliverables shall be addressed via formal Change Request."),
       this.createBullet("Access Delays: Delay in granting required permissions extends the timeline on a day-for-day basis.")
     );
 
     // --- SECTION 8: SUCCESS CRITERIA & ACCEPTANCE ---
+    const successList = data.successCriteria || [
+      `1. All in-scope workloads and environments (Dev, UAT, Production) successfully deployed on ${spec.name}.`,
+      "2. Production cutover executed with all core services passing smoke and health checks.",
+      "3. Zero open P1 (critical outage) or P2 (severe degradation) defects attributable to the deployment.",
+      "4. As-Built architecture documentation and knowledge transfer completed and formally signed off by Customer.",
+    ];
+
     docChildren.push(
       this.createSectionHeading("8. Success Criteria & Acceptance"),
       this.createParagraph(
         "The project will be deemed successfully completed when the following measurable criteria have been satisfied:"
       ),
-      this.createBullet(`1. All in-scope workloads and environments (Dev, UAT, Production) successfully deployed on ${spec.name}.`),
-      this.createBullet("2. Production cutover executed with all core services passing smoke and health checks."),
-      this.createBullet("3. Zero open P1 (critical outage) or P2 (severe degradation) defects attributable to the deployment."),
-      this.createBullet("4. As-Built architecture documentation and knowledge transfer completed and formally signed off by Customer.")
+      ...successList.map((s) => this.createBullet(s))
     );
 
     // --- SECTION 9: COMMERCIAL TERMS & PRICING ---
