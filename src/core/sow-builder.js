@@ -287,39 +287,80 @@ class SowBuilder {
     const docChildren = [];
 
     // --- COVER PAGE ---
+    docChildren.push(
+      new Paragraph({
+        spacing: { before: 200, after: 80 },
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({
+            text: clientName,
+            bold: true,
+            size: 32,
+            color: BRAND.colors.primary,
+            font: BRAND.fonts.primary,
+          }),
+        ],
+      }),
+      this.createTitle("STATEMENT OF WORK"),
+      this.createProjectTitle(projectName),
+      new Paragraph({
+        spacing: { before: 120, after: 60 },
+        alignment: AlignmentType.CENTER,
+        children: [
+          new TextRun({
+            text: "Client: ",
+            bold: true,
+            size: 22,
+            color: BRAND.colors.dark,
+            font: BRAND.fonts.primary,
+          }),
+          new TextRun({
+            text: `${clientName}  |  `,
+            size: 22,
+            color: BRAND.colors.body,
+            font: BRAND.fonts.primary,
+          }),
+          new TextRun({
+            text: "Date: ",
+            bold: true,
+            size: 22,
+            color: BRAND.colors.dark,
+            font: BRAND.fonts.primary,
+          }),
+          new TextRun({
+            text: `${this.date}  |  `,
+            size: 22,
+            color: BRAND.colors.body,
+            font: BRAND.fonts.primary,
+          }),
+          new TextRun({
+            text: "Scope: ",
+            bold: true,
+            size: 22,
+            color: BRAND.colors.dark,
+            font: BRAND.fonts.primary,
+          }),
+          new TextRun({
+            text: `${spec.name} ${engagementType}`,
+            size: 22,
+            color: BRAND.colors.body,
+            font: BRAND.fonts.primary,
+          }),
+        ],
+      })
+    );
+
     if (logoRun) {
       docChildren.push(
         new Paragraph({
           alignment: AlignmentType.CENTER,
-          spacing: { before: 400, after: 200 },
+          spacing: { before: 300, after: 300 },
           children: [logoRun],
         })
       );
     }
 
     docChildren.push(
-      this.createTitle("STATEMENT OF WORK"),
-      this.createProjectTitle(projectName),
-      this.createSubtitle(`${clientName} — Powered by ${spec.name} Services`),
-      new Paragraph({ spacing: { before: 140, after: 60 }, children: [] }),
-      this.createTable(
-        ["Attribute", "Engagement Specification"],
-        [
-          ["Prepared by:", BRAND.legalName || "Atlasgeek Technology and Consultant LLP"],
-          ["Address:", BRAND.address || "Sector 2, Greater Noida West, Gautam Buddha Nagar, Uttar Pradesh – 201307"],
-          ["Prepared for:", `${clientName} (https://${clientName.toLowerCase().replace(/[^a-z0-9]/g, "")}.com/)`],
-          ["Engagement Scope:", `${spec.name} ${engagementType}`],
-          ["Document Version:", this.version],
-          ["Classification:", "Confidential"],
-          ["Date:", this.date],
-          ["SOW Type:", "Fixed-Price | Milestone-Based Implementation"],
-          [`${spec.name} Program:`, `${spec.program}`],
-          ["Partner Credential:", spec.partnerCredential || "Google Cloud Certified Consulting Partner"],
-          ["Governing Agreement:", "Atlas Geek Master Services Agreement (MSA) or Customer Terms"],
-        ],
-        [3000, 6000]
-      ),
-      new Paragraph({ spacing: { before: 140, after: 0 }, children: [] }),
       this.createCallout(
         `Commercial & Governance Framework (${spec.name})`,
         provider === "google"
