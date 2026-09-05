@@ -5,10 +5,12 @@ const url = require("url");
 const { exec } = require("child_process");
 
 const SowBuilder = require("../core/sow-builder");
-const PsfValidator = require("../core/psf-validator");
+const SowValidator = require("../core/sow-validator");
+const prdAnalyzer = require("../core/prd-analyzer");
 const clientResolver = require("../core/client-resolver");
 const { convertDocxToMarkdown } = require("../sync/docx-to-md");
 const BRAND = require("../templates/brand-theme");
+const HYPERSCALER_SPECS = require("../templates/hyperscaler-specs");
 
 const PORT = process.env.PORT || 4100;
 
@@ -18,11 +20,13 @@ function getClientDetails(clientName) {
   const inputs = clientResolver.getInputFiles(clientName);
   const outputs = clientResolver.getOutputFiles(clientName);
 
-  // Read checklist report if exists
+  // Read latest audit report if exists
   let checklistContent = null;
-  const checklistFile = outputs.find((f) => f.isChecklist);
+  const checklistFile = outputs.find((f) => f.name.includes("checklist") || f.name.includes("audit"));
   if (checklistFile) {
-    checklistContent = fs.readFileSync(checklistFile.fullPath, "utf-8");
+    try {
+      checklistContent = fs.readFileSync(checklistFile.fullPath, "utf-8");
+    } catch (e) {}
   }
 
   return {
@@ -43,10 +47,10 @@ function renderDashboardHTML() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Atlas Geek SOW Manager — Google PSF/DAF Studio</title>
+  <title>Atlas Geek SOW Manager — Multi-Hyperscaler Studio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
     :root {
       --primary: #3F51B5;
@@ -59,6 +63,8 @@ function renderDashboardHTML() {
       --border: #E2E8F0;
       --success: #059669;
       --success-bg: #ECFDF5;
+      --warning: #D97706;
+      --warning-bg: #FFFBEB;
       --card-bg: #FFFFFF;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -73,13 +79,14 @@ function renderDashboardHTML() {
     header {
       background: #ffffff;
       border-bottom: 1px solid var(--border);
-      padding: 1rem 2rem;
+      padding: 0.85rem 2rem;
       display: flex;
       align-items: center;
       justify-content: space-between;
       position: sticky;
       top: 0;
       z-index: 100;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.03);
     }
     .brand-box {
       display: flex;
@@ -87,23 +94,23 @@ function renderDashboardHTML() {
       gap: 1.25rem;
     }
     .brand-logo {
-      height: 46px;
+      height: 44px;
       object-fit: contain;
     }
     .brand-title h1 {
-      font-size: 1.25rem;
+      font-size: 1.2rem;
       font-weight: 800;
       color: var(--dark);
       line-height: 1.2;
     }
     .brand-title p {
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       color: var(--muted);
       font-weight: 500;
     }
     .header-badges {
       display: flex;
-      gap: 0.75rem;
+      gap: 0.6rem;
       align-items: center;
     }
     .badge {
@@ -115,7 +122,7 @@ function renderDashboardHTML() {
       align-items: center;
       gap: 0.35rem;
     }
-    .badge-psf {
+    .badge-provider {
       background: #EEF2FF;
       color: var(--primary);
       border: 1px solid #C7D2FE;
@@ -129,13 +136,14 @@ function renderDashboardHTML() {
       display: grid;
       grid-template-columns: 310px 1fr;
       flex: 1;
-      height: calc(100vh - 75px);
+      height: calc(100vh - 70px);
     }
+
     /* Sidebar */
     aside {
       background: #FFFFFF;
       border-right: 1px solid var(--border);
-      padding: 1.5rem 1rem;
+      padding: 1.25rem 1rem;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
@@ -145,35 +153,53 @@ function renderDashboardHTML() {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 0 0.5rem;
+      padding: 0 0.25rem;
     }
     .sidebar-header h2 {
-      font-size: 0.85rem;
+      font-size: 0.8rem;
       text-transform: uppercase;
       letter-spacing: 0.05em;
       color: var(--muted);
       font-weight: 700;
     }
     .search-box {
-      padding: 0 0.25rem;
+      position: relative;
     }
     .search-input {
       width: 100%;
-      padding: 0.55rem 0.75rem;
+      padding: 0.55rem 0.75rem 0.55rem 2rem;
       border: 1px solid var(--border);
       border-radius: 0.4rem;
       font-size: 0.85rem;
       outline: none;
+      transition: all 0.15s;
+    }
+    .search-icon {
+      position: absolute;
+      left: 0.65rem;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 0.8rem;
+      color: var(--muted);
     }
     .search-input:focus {
       border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(63,81,181,0.15);
+    }
+    .client-list-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin-top: 0.25rem;
+      padding-left: 0.25rem;
     }
     .client-list {
       list-style: none;
       display: flex;
       flex-direction: column;
-      gap: 0.25rem;
+      gap: 0.3rem;
       overflow-y: auto;
+      flex: 1;
     }
     .client-item {
       padding: 0.65rem 0.85rem;
@@ -187,35 +213,55 @@ function renderDashboardHTML() {
       justify-content: space-between;
       transition: all 0.15s ease;
       word-break: break-word;
+      border: 1px solid transparent;
     }
     .client-item:hover {
       background: #F1F5F9;
+      border-color: var(--border);
     }
     .client-item.active {
       background: var(--primary);
       color: #FFFFFF;
       font-weight: 600;
     }
+    .btn-see-more {
+      background: #F8FAFC;
+      border: 1px solid var(--border);
+      color: var(--primary);
+      padding: 0.5rem;
+      border-radius: 0.4rem;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      text-align: center;
+      transition: all 0.15s;
+    }
+    .btn-see-more:hover {
+      background: #EEF2FF;
+      border-color: #C7D2FE;
+    }
     .btn-new-client {
-      background: #F1F5F9;
+      background: #FFFFFF;
       border: 1px dashed #CBD5E1;
       color: var(--primary);
       padding: 0.6rem;
-      border-radius: 0.5rem;
+      border-radius: 0.4rem;
       font-size: 0.85rem;
       font-weight: 600;
       cursor: pointer;
       width: 100%;
       text-align: center;
-      transition: all 0.2s ease;
+      transition: all 0.15s;
     }
     .btn-new-client:hover {
       background: #EEF2FF;
       border-color: var(--primary);
     }
+
     /* Content Area */
     main {
-      padding: 2rem;
+      padding: 1.75rem 2rem;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
@@ -226,7 +272,7 @@ function renderDashboardHTML() {
       border: 1px solid var(--border);
       border-radius: 0.75rem;
       padding: 1.5rem;
-      box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.02);
     }
     .card-header {
       display: flex;
@@ -238,12 +284,159 @@ function renderDashboardHTML() {
     }
     .card-title {
       font-size: 1.1rem;
-      font-weight: 700;
+      font-weight: 800;
       color: var(--dark);
       display: flex;
       align-items: center;
       gap: 0.5rem;
     }
+
+    /* Hyperscaler Selector Tabs */
+    .provider-nav {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0.6rem;
+      margin-bottom: 1.25rem;
+    }
+    .provider-tab {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      padding: 0.75rem 0.9rem;
+      border: 1.5px solid var(--border);
+      border-radius: 0.5rem;
+      background: #FFFFFF;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .provider-tab:hover {
+      border-color: #94A3B8;
+      transform: translateY(-1px);
+    }
+    .provider-tab.active {
+      border-color: var(--primary);
+      background: #F5F7FF;
+      box-shadow: 0 0 0 2px rgba(63,81,181,0.2);
+    }
+    .provider-tab-header {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-weight: 700;
+      font-size: 0.85rem;
+      color: var(--dark);
+    }
+    .provider-tab-sub {
+      font-size: 0.72rem;
+      color: var(--muted);
+      line-height: 1.2;
+    }
+
+    /* Discovery Intake Area */
+    .intake-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.25rem;
+      margin-bottom: 1.25rem;
+    }
+    .dropzone {
+      border: 2px dashed #CBD5E1;
+      border-radius: 0.5rem;
+      padding: 1.25rem;
+      text-align: center;
+      background: #FAFAFC;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    .dropzone:hover, .dropzone.dragover {
+      border-color: var(--primary);
+      background: #EEF2FF;
+    }
+    .dropzone-icon {
+      font-size: 2rem;
+    }
+    .dropzone-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--dark);
+    }
+    .dropzone-sub {
+      font-size: 0.75rem;
+      color: var(--muted);
+    }
+    .notes-textarea {
+      width: 100%;
+      height: 120px;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      font-family: inherit;
+      font-size: 0.85rem;
+      outline: none;
+      resize: vertical;
+      color: var(--dark);
+      transition: border 0.15s;
+    }
+    .notes-textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(63,81,181,0.15);
+    }
+
+    /* Gap Analyzer Card */
+    .analyzer-box {
+      background: #F8FAFC;
+      border: 1px solid var(--border);
+      border-radius: 0.5rem;
+      padding: 1rem;
+      margin-bottom: 1.25rem;
+    }
+    .analyzer-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.6rem;
+    }
+    .analyzer-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--dark);
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+    .gap-item {
+      background: #FFFBEB;
+      border-left: 3px solid var(--warning);
+      padding: 0.6rem 0.75rem;
+      border-radius: 0.25rem;
+      font-size: 0.8rem;
+      margin-top: 0.4rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .gap-item span {
+      color: #78350F;
+    }
+    .gap-btn {
+      background: #FFFFFF;
+      border: 1px solid #FCD34D;
+      color: #92400E;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .gap-btn:hover {
+      background: #FEF3C7;
+    }
+
     .location-info {
       font-size: 0.8rem;
       color: var(--muted);
@@ -274,9 +467,22 @@ function renderDashboardHTML() {
       align-items: center;
       gap: 0.35rem;
     }
+    .workload-chip {
+      background: #ECFDF5;
+      color: #065F46;
+      border: 1px solid #A7F3D0;
+      padding: 0.35rem 0.65rem;
+      border-radius: 0.35rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
     .form-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
       gap: 1.25rem;
       margin-bottom: 1.5rem;
     }
@@ -287,7 +493,7 @@ function renderDashboardHTML() {
     }
     .form-group label {
       font-size: 0.8rem;
-      font-weight: 600;
+      font-weight: 700;
       color: var(--dark);
     }
     .form-group input, .form-group select {
@@ -303,10 +509,12 @@ function renderDashboardHTML() {
       border-color: var(--primary);
       box-shadow: 0 0 0 3px rgba(63, 81, 181, 0.15);
     }
+
+    /* Milestone Breakdown Card */
     .milestone-preview {
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 1rem;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.85rem;
       background: #F8FAFC;
       border: 1px solid var(--border);
       border-radius: 0.5rem;
@@ -314,19 +522,21 @@ function renderDashboardHTML() {
       margin-bottom: 1.5rem;
     }
     .milestone-item h4 {
-      font-size: 0.75rem;
+      font-size: 0.72rem;
       text-transform: uppercase;
       color: var(--muted);
       margin-bottom: 0.25rem;
+      font-weight: 700;
     }
     .milestone-item p {
-      font-size: 1.2rem;
+      font-size: 1.15rem;
       font-weight: 800;
       color: var(--primary);
     }
     .milestone-item.accent p {
       color: var(--accent);
     }
+
     .action-row {
       display: flex;
       gap: 0.85rem;
@@ -367,6 +577,7 @@ function renderDashboardHTML() {
       background: #F8FAFC;
       border-color: #CBD5E1;
     }
+
     /* Deliverables Grid */
     .files-grid {
       display: grid;
@@ -431,7 +642,8 @@ function renderDashboardHTML() {
       background: #F1F5F9;
       color: var(--dark);
     }
-    /* Checklist Scorecard */
+
+    /* Scorecard Banner */
     .scorecard-banner {
       background: linear-gradient(135deg, #10B981, #059669);
       color: #FFFFFF;
@@ -442,13 +654,16 @@ function renderDashboardHTML() {
       justify-content: space-between;
       margin-bottom: 1rem;
     }
+    .scorecard-banner.blocked {
+      background: linear-gradient(135deg, #EF4444, #B91C1C);
+    }
     .scorecard-text h3 {
-      font-size: 1.2rem;
+      font-size: 1.15rem;
       font-weight: 800;
     }
     .scorecard-text p {
       font-size: 0.85rem;
-      opacity: 0.9;
+      opacity: 0.95;
     }
     .scorecard-percent {
       font-size: 2.25rem;
@@ -460,10 +675,11 @@ function renderDashboardHTML() {
       font-family: monospace;
       padding: 1rem;
       border-radius: 0.5rem;
-      font-size: 0.85rem;
-      max-height: 240px;
+      font-size: 0.82rem;
+      max-height: 320px;
       overflow-y: auto;
       white-space: pre-wrap;
+      line-height: 1.4;
     }
   </style>
 </head>
@@ -474,27 +690,30 @@ function renderDashboardHTML() {
       <img src="/api/logo" alt="Atlas Geek" class="brand-logo">
       <div class="brand-title">
         <h1>Atlas Geek SOW Manager</h1>
-        <p>Google Cloud PSF & DAF Studio • Drive: <code>AG_Client</code></p>
+        <p>Hyperscaler-Neutral Statement of Work Studio • Google Drive: <code>AG_Client</code></p>
       </div>
     </div>
     <div class="header-badges">
-      <span class="badge badge-psf">🛡️ Google Cloud PSF Compliant</span>
-      <span class="badge badge-sync">🔄 Google Drive Synced: AG_Client</span>
+      <span class="badge badge-provider" id="activeProviderBadge">Cloud: Google Cloud PSF</span>
+      <span class="badge badge-sync">🔄 Drive Synced: AG_Client</span>
     </div>
   </header>
 
   <div class="main-container">
-    <!-- Sidebar -->
+    <!-- Sidebar: Search + Top 5 Recent + See More -->
     <aside>
       <div class="sidebar-header">
-        <h2>Engagements in AG_Client</h2>
-        <span id="clientCount" style="font-size:0.75rem; font-weight:700; color:var(--primary);">0</span>
+        <h2>Recent Engagements</h2>
+        <span id="clientCount" style="font-size:0.75rem; font-weight:700; color:var(--primary);">0 Total</span>
       </div>
       <div class="search-box">
-        <input type="text" id="clientSearch" class="search-input" placeholder="Filter clients..." oninput="filterClients()">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="clientSearch" class="search-input" placeholder="Search all 59+ clients..." oninput="handleSearch()">
       </div>
+      <div class="client-list-label" id="listModeLabel">5 Most Recent</div>
       <ul class="client-list" id="clientList"></ul>
-      <button class="btn-new-client" onclick="promptNewClient()">+ New Engagement</button>
+      <button class="btn-see-more" id="btnSeeMore" onclick="loadMoreRecentClients()">+ See More (+5)</button>
+      <button class="btn-new-client" onclick="promptNewClient()">+ New Engagement Folder</button>
     </aside>
 
     <!-- Main Workspace -->
@@ -506,71 +725,109 @@ function renderDashboardHTML() {
             <span>⚙️</span>
             <span id="selectedClientTitle">Engagement Configuration</span>
           </div>
-          <span class="badge badge-psf" id="psfTypeBadge">PSF: Implementation</span>
+          <span class="badge badge-provider" id="governanceBadge">Google PSF 18-Point Compliant</span>
+        </div>
+
+        <!-- Hyperscaler Selector Tabs -->
+        <label style="font-size:0.8rem; font-weight:700; color:var(--dark); margin-bottom:0.5rem; display:block;">
+          Select Cloud Provider / Engagement Program:
+        </label>
+        <div class="provider-nav">
+          <div class="provider-tab active" id="tab-google" onclick="setProvider('google')">
+            <div class="provider-tab-header"><span>🌐</span> Google Cloud</div>
+            <div class="provider-tab-sub">PSF / DAF (70/30 Model)</div>
+          </div>
+          <div class="provider-tab" id="tab-aws" onclick="setProvider('aws')">
+            <div class="provider-tab-header"><span>🟧</span> AWS (Amazon)</div>
+            <div class="provider-tab-sub">MAP 2.0 & Well-Architected</div>
+          </div>
+          <div class="provider-tab" id="tab-azure" onclick="setProvider('azure')">
+            <div class="provider-tab-header"><span>🟦</span> Microsoft Azure</div>
+            <div class="provider-tab-sub">AMMP & Cloud Adoption (CAF)</div>
+          </div>
+          <div class="provider-tab" id="tab-agnostic" onclick="setProvider('agnostic')">
+            <div class="provider-tab-header"><span>⚡</span> Cloud Agnostic</div>
+            <div class="provider-tab-sub">Enterprise Solution Arch</div>
+          </div>
         </div>
 
         <div class="location-info">
           <div>
-            <strong>Google Drive Location:</strong>
+            <strong>Google Drive Folder:</strong>
             <span id="clientPathDisplay">Loading path...</span>
           </div>
           <button class="btn btn-outline" style="padding:0.3rem 0.75rem; font-size:0.75rem;" onclick="openFolder()">
-            📂 Open in Google Drive
+            📂 Open in Finder / Drive
           </button>
         </div>
 
-        <div>
-          <label style="font-size:0.8rem; font-weight:700; color:var(--dark); margin-bottom:0.5rem; display:block;">
-            Discovery Inputs Detected in <code>INTERNAL/</code>:
-          </label>
-          <div class="inputs-chip-row" id="inputsChipRow">
-            <span style="font-size:0.8rem; color:var(--muted);">Scanning for transcripts and documents...</span>
+        <!-- Discovery & PRD Intake Workspace -->
+        <label style="font-size:0.8rem; font-weight:700; color:var(--dark); margin-bottom:0.5rem; display:block;">
+          PRD Documents & Discovery Intake (Saved into <code>INTERNAL/</code>):
+        </label>
+        <div class="intake-grid">
+          <!-- File Dropzone -->
+          <div class="dropzone" id="dropzone" onclick="document.getElementById('fileInput').click()">
+            <input type="file" id="fileInput" style="display:none;" onchange="handleFileUpload(this.files)" accept=".docx,.md,.txt,.pdf,.json">
+            <div class="dropzone-icon">📥</div>
+            <div class="dropzone-title">Upload PRD or Transcript Document</div>
+            <div class="dropzone-sub">Drag & drop or click to upload (.docx, .md, .txt, .pdf) directly to INTERNAL/</div>
+          </div>
+
+          <!-- Commentary / Context Box -->
+          <div>
+            <textarea id="contextNotes" class="notes-textarea" placeholder="Type or paste client context, transcript notes, specific constraints, or answers to open questions here..." oninput="triggerPrdAnalysis()"></textarea>
           </div>
         </div>
 
+        <!-- Detected Inputs in INTERNAL/ -->
+        <div style="margin-bottom:1rem;">
+          <div class="inputs-chip-row" id="inputsChipRow">
+            <span style="font-size:0.8rem; color:var(--muted);">No input files found in INTERNAL/ yet.</span>
+          </div>
+        </div>
+
+        <!-- Gap Analyzer & Discovery Intelligence Card -->
+        <div class="analyzer-box" id="analyzerBox">
+          <div class="analyzer-header">
+            <div class="analyzer-title">
+              <span>🧠</span>
+              <span>Intelligent Discovery & Gap Analysis</span>
+            </div>
+            <span id="analyzerConfidence" style="font-size:0.75rem; font-weight:600; color:var(--muted);">Analyzing...</span>
+          </div>
+          <div id="workloadChips" style="display:flex; flex-wrap:wrap; gap:0.4rem; margin-bottom:0.6rem;"></div>
+          <div id="gapAlerts"></div>
+        </div>
+
+        <!-- Parameters Grid -->
         <div class="form-grid">
           <div class="form-group">
             <label>Project Title</label>
-            <input type="text" id="projectTitle" value="Google Cloud Modernization & Deployment">
+            <input type="text" id="projectTitle" value="Cloud Modernization & Deployment">
           </div>
           <div class="form-group">
-            <label>Google PSF Engagement Type</label>
-            <select id="engagementType" onchange="updateBadges()">
-              <option value="Implementation" selected>Implementation</option>
-              <option value="Migration">Migration</option>
-              <option value="Foundations">Foundations</option>
-              <option value="Deployment">Deployment</option>
-            </select>
+            <label id="typeSelectLabel">Engagement Scope / Program Type</label>
+            <select id="engagementType"></select>
           </div>
           <div class="form-group">
             <label>Fixed Price Fee (USD)</label>
-            <input type="number" id="feeInput" value="45000" step="1000" oninput="updateMilestones()">
+            <input type="number" id="feeInput" value="50000" step="1000" oninput="updateMilestones()">
           </div>
         </div>
 
-        <!-- PSF 70/30 Milestone Breakdown -->
-        <div class="milestone-preview">
-          <div class="milestone-item">
-            <h4>Milestone 1: Project Completion (70%)</h4>
-            <p id="m1Amount">$31,500 USD</p>
-            <span style="font-size:0.75rem; color:var(--muted);">Payable upon completion of all deliverables</span>
-          </div>
-          <div class="milestone-item accent">
-            <h4>Milestone 2: Consumption Break-Even (30%)</h4>
-            <p id="m2Amount">$13,500 USD</p>
-            <span style="font-size:0.75rem; color:var(--muted);">Payable upon tenant consumption verification</span>
-          </div>
-        </div>
+        <!-- Dynamic Milestone Breakdown -->
+        <div class="milestone-preview" id="milestonePreview"></div>
 
         <div class="action-row">
           <button class="btn btn-primary" id="btnGenerate" onclick="triggerGenerate()">
-            <span>⚡</span> Generate SOW Document
+            <span>⚡</span> Generate SOW Document (.docx + .md)
           </button>
           <button class="btn btn-outline" id="btnValidate" onclick="triggerValidate()">
-            <span>🔍</span> Audit PSF Checklist
+            <span>🔍</span> Audit Compliance Checklist
           </button>
           <button class="btn btn-outline" onclick="openFolder()">
-            <span>📂</span> Open EXTERNAL/ Folder
+            <span>📂</span> Open EXTERNAL/ Deliverables
           </button>
         </div>
       </section>
@@ -590,20 +847,20 @@ function renderDashboardHTML() {
         </div>
       </section>
 
-      <!-- PSF Checklist Scorecard -->
+      <!-- Hyperscaler Audit Scorecard -->
       <section class="card" id="checklistSection" style="display:none;">
         <div class="card-header">
           <div class="card-title">
             <span>🛡️</span>
-            <span>Google Cloud PSF/DAF Compliance Scorecard</span>
+            <span id="scorecardHeading">Hyperscaler Compliance Scorecard</span>
           </div>
         </div>
-        <div class="scorecard-banner">
+        <div class="scorecard-banner" id="scorecardBanner">
           <div class="scorecard-text">
-            <h3>Google PSF / DAF Review: 100% PASS</h3>
-            <p>All 18 mandatory checklist criteria have been satisfied. Ready for submission to regional Google approver.</p>
+            <h3 id="scorecardTitle">Audit Status</h3>
+            <p id="scorecardSubtitle">Itemized checklist details below.</p>
           </div>
-          <div class="scorecard-percent">100%</div>
+          <div class="scorecard-percent" id="scorecardPct">100%</div>
         </div>
         <div class="log-terminal" id="checklistLog"></div>
       </section>
@@ -611,43 +868,151 @@ function renderDashboardHTML() {
   </div>
 
   <script>
-    let clients = [];
+    const SPECS = ${JSON.stringify(HYPERSCALER_SPECS)};
+
+    let currentProvider = "google";
+    let recentOffset = 0;
+    const RECENT_LIMIT = 5;
+    let recentClientsList = [];
     let currentClient = "";
+    let isSearchActive = false;
 
     async function init() {
-      const res = await fetch('/api/clients');
-      clients = await res.json();
-      document.getElementById('clientCount').textContent = clients.length;
-      renderClientList(clients);
-      
-      // Select Hectares Agrotech or first client
-      const defaultClient = clients.find(c => c.toLowerCase().includes('hectares')) || clients[0];
-      if (defaultClient) {
-        selectClient(defaultClient);
+      setupDropzone();
+      await loadRecentClients(false);
+
+      // Select first recent client
+      if (recentClientsList.length > 0) {
+        selectClient(recentClientsList[0].name);
       }
+      setProvider('google');
     }
 
-    function renderClientList(list) {
+    // Load recent clients with paging
+    async function loadRecentClients(append = false) {
+      if (!append) {
+        recentOffset = 0;
+        recentClientsList = [];
+      }
+      const res = await fetch('/api/clients?recent=true&limit=' + RECENT_LIMIT + '&offset=' + recentOffset);
+      const data = await res.json();
+      
+      document.getElementById('clientCount').textContent = data.total + ' Total';
+      
+      if (append) {
+        recentClientsList = recentClientsList.concat(data.clients);
+      } else {
+        recentClientsList = data.clients;
+      }
+      recentOffset += data.clients.length;
+
+      document.getElementById('btnSeeMore').style.display = data.hasMore ? 'block' : 'none';
+      document.getElementById('listModeLabel').textContent = recentClientsList.length + ' Most Recent';
+      renderClients(recentClientsList);
+    }
+
+    async function loadMoreRecentClients() {
+      await loadRecentClients(true);
+    }
+
+    // Client search handler
+    async function handleSearch() {
+      const q = document.getElementById('clientSearch').value.trim();
+      if (!q) {
+        isSearchActive = false;
+        document.getElementById('btnSeeMore').style.display = 'block';
+        document.getElementById('listModeLabel').textContent = recentClientsList.length + ' Most Recent';
+        renderClients(recentClientsList);
+        return;
+      }
+
+      isSearchActive = true;
+      document.getElementById('btnSeeMore').style.display = 'none';
+      document.getElementById('listModeLabel').textContent = 'Search Results';
+      
+      const res = await fetch('/api/clients?search=' + encodeURIComponent(q));
+      const matches = await res.json();
+      renderClients(matches.map(name => ({ name })));
+    }
+
+    function renderClients(items) {
       const listEl = document.getElementById('clientList');
       listEl.innerHTML = '';
-      list.forEach(c => {
+      if (items.length === 0) {
+        listEl.innerHTML = '<li style="font-size:0.8rem; color:var(--muted); padding:0.5rem;">No clients match.</li>';
+        return;
+      }
+      items.forEach(c => {
         const li = document.createElement('li');
-        li.className = 'client-item' + (c === currentClient ? ' active' : '');
-        li.innerHTML = '<span>' + c + '</span><span>📁</span>';
-        li.onclick = () => selectClient(c);
+        li.className = 'client-item' + (c.name === currentClient ? ' active' : '');
+        li.innerHTML = '<span>' + c.name + '</span><span>📁</span>';
+        li.onclick = () => selectClient(c.name);
         listEl.appendChild(li);
       });
     }
 
-    function filterClients() {
-      const q = document.getElementById('clientSearch').value.toLowerCase();
-      const filtered = clients.filter(c => c.toLowerCase().includes(q));
-      renderClientList(filtered);
+    // Set Provider (Google, AWS, Azure, Agnostic)
+    function setProvider(provider) {
+      currentProvider = provider;
+      const spec = SPECS[provider];
+
+      // Update Tabs
+      document.querySelectorAll('.provider-tab').forEach(t => t.classList.remove('active'));
+      const activeTab = document.getElementById('tab-' + provider);
+      if (activeTab) activeTab.classList.add('active');
+
+      // Update Badges
+      document.getElementById('activeProviderBadge').textContent = 'Cloud: ' + spec.name;
+      document.getElementById('governanceBadge').textContent = spec.governingRules;
+
+      // Populate engagement types
+      const typeSelect = document.getElementById('engagementType');
+      typeSelect.innerHTML = '';
+      spec.engagementTypes.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t;
+        opt.textContent = t;
+        if (t === spec.defaultEngagementType) opt.selected = true;
+        typeSelect.appendChild(opt);
+      });
+
+      // Update Title placeholder if default
+      document.getElementById('projectTitle').value = spec.name + ' Modernization & Deployment';
+
+      updateMilestones();
+    }
+
+    function updateMilestones() {
+      const fee = parseFloat(document.getElementById('feeInput').value) || 0;
+      const spec = SPECS[currentProvider];
+      const previewEl = document.getElementById('milestonePreview');
+      previewEl.innerHTML = '';
+
+      let cumulative = 0;
+      spec.milestoneSplit.forEach((m, idx) => {
+        const isLast = idx === spec.milestoneSplit.length - 1;
+        const amount = isLast ? (fee - cumulative) : Math.round(fee * m.pct);
+        cumulative += amount;
+
+        const item = document.createElement('div');
+        item.className = 'milestone-item' + (idx % 2 === 1 ? ' accent' : '');
+        item.innerHTML = 
+          '<h4>' + m.name + ' (' + Math.round(m.pct * 100) + '%)</h4>' +
+          '<p>$' + amount.toLocaleString() + ' USD</p>' +
+          '<span style="font-size:0.72rem; color:var(--muted);">' + m.desc + '</span>';
+        previewEl.appendChild(item);
+      });
     }
 
     async function selectClient(clientName) {
       currentClient = clientName;
-      filterClients();
+      
+      // Update sidebar selection
+      document.querySelectorAll('.client-item').forEach(el => {
+        if (el.textContent.includes(clientName)) el.classList.add('active');
+        else el.classList.remove('active');
+      });
+
       document.getElementById('selectedClientTitle').textContent = clientName + ' — Configuration';
       
       const res = await fetch('/api/client?name=' + encodeURIComponent(clientName));
@@ -663,13 +1028,15 @@ function renderDashboardHTML() {
       } else {
         document.getElementById('checklistSection').style.display = 'none';
       }
+
+      await triggerPrdAnalysis();
     }
 
     function renderInputs(inputs) {
       const row = document.getElementById('inputsChipRow');
       row.innerHTML = '';
       if (!inputs || inputs.length === 0) {
-        row.innerHTML = '<span style="font-size:0.8rem; color:var(--muted);">No input files found in INTERNAL/ yet.</span>';
+        row.innerHTML = '<span style="font-size:0.8rem; color:var(--muted);">No input files found in INTERNAL/ yet. Drop or upload PRD files above.</span>';
         return;
       }
       inputs.forEach(f => {
@@ -680,17 +1047,107 @@ function renderDashboardHTML() {
       });
     }
 
-    function updateMilestones() {
-      const fee = parseFloat(document.getElementById('feeInput').value) || 0;
-      const m1 = Math.round(fee * 0.7);
-      const m2 = fee - m1;
-      document.getElementById('m1Amount').textContent = '$' + m1.toLocaleString() + ' USD';
-      document.getElementById('m2Amount').textContent = '$' + m2.toLocaleString() + ' USD';
+    // Trigger AI / Heuristic Discovery Analysis
+    async function triggerPrdAnalysis() {
+      if (!currentClient) return;
+      const notes = document.getElementById('contextNotes').value;
+      
+      const res = await fetch('/api/analyze-prd', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client: currentClient, contextNotes: notes }),
+      });
+      const data = await res.json();
+
+      // Render Workloads
+      const chipContainer = document.getElementById('workloadChips');
+      chipContainer.innerHTML = '';
+      data.workloads.forEach(w => {
+        const c = document.createElement('span');
+        c.className = 'workload-chip';
+        c.innerHTML = w.icon + ' ' + w.name;
+        chipContainer.appendChild(c);
+      });
+
+      // Update provider hint if detected
+      if (data.detectedProvider && data.detectedProvider !== currentProvider) {
+        document.getElementById('analyzerConfidence').innerHTML = 
+          'Recommended Cloud: <strong style="color:var(--primary); cursor:pointer;" onclick="setProvider(\\'' + data.detectedProvider + '\\')">' + 
+          SPECS[data.detectedProvider].name + ' (Switch)</strong>';
+      } else {
+        document.getElementById('analyzerConfidence').textContent = data.totalSourceFiles + ' files in INTERNAL/ • ' + data.workloads.length + ' workloads mapped';
+      }
+
+      // Render Gaps
+      const gapEl = document.getElementById('gapAlerts');
+      gapEl.innerHTML = '';
+      if (data.gaps.length === 0) {
+        gapEl.innerHTML = '<div style="font-size:0.8rem; color:var(--success); font-weight:600;">✅ Discovery Complete: Sizing and core parameters detected!</div>';
+      } else {
+        data.gaps.forEach(g => {
+          const div = document.createElement('div');
+          div.className = 'gap-item';
+          div.innerHTML = 
+            '<span>⚠️ <strong>' + g.category + ':</strong> ' + g.question + '</span>' +
+            '<button class="gap-btn" onclick="injectGapHint(\\'' + g.hint.replace(/'/g, "\\\\'") + '\\')">+ Add Answer</button>';
+          gapEl.appendChild(div);
+        });
+      }
     }
 
-    function updateBadges() {
-      const type = document.getElementById('engagementType').value;
-      document.getElementById('psfTypeBadge').textContent = 'PSF: ' + type;
+    function injectGapHint(hint) {
+      const textarea = document.getElementById('contextNotes');
+      if (textarea.value.trim()) {
+        textarea.value += '\\n' + hint;
+      } else {
+        textarea.value = hint;
+      }
+      triggerPrdAnalysis();
+    }
+
+    // Dropzone setup
+    function setupDropzone() {
+      const dropzone = document.getElementById('dropzone');
+      ['dragenter', 'dragover'].forEach(name => {
+        dropzone.addEventListener(name, (e) => { e.preventDefault(); dropzone.classList.add('dragover'); });
+      });
+      ['dragleave', 'drop'].forEach(name => {
+        dropzone.addEventListener(name, (e) => { e.preventDefault(); dropzone.classList.remove('dragover'); });
+      });
+      dropzone.addEventListener('drop', (e) => {
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) handleFileUpload(files);
+      });
+    }
+
+    // Upload file directly into AG_Client/<Client>/INTERNAL/
+    async function handleFileUpload(files) {
+      if (!currentClient) return alert('Please select a client first');
+      const file = files[0];
+      if (!file) return;
+
+      const dropzone = document.getElementById('dropzone');
+      dropzone.innerHTML = '<div class="dropzone-icon">⏳</div><div class="dropzone-title">Uploading ' + file.name + ' to INTERNAL/...</div>';
+
+      try {
+        const res = await fetch('/api/upload-input?client=' + encodeURIComponent(currentClient) + '&filename=' + encodeURIComponent(file.name), {
+          method: 'POST',
+          body: file,
+        });
+        const result = await res.json();
+        if (result.success) {
+          await selectClient(currentClient);
+        } else {
+          alert('Upload failed: ' + result.error);
+        }
+      } catch (e) {
+        alert('Upload error: ' + e.message);
+      } finally {
+        dropzone.innerHTML = 
+          '<div class="dropzone-icon">📥</div>' +
+          '<div class="dropzone-title">Upload PRD or Transcript Document</div>' +
+          '<div class="dropzone-sub">Drag & drop or click to upload (.docx, .md, .txt, .pdf) directly to INTERNAL/</div>';
+      }
     }
 
     function renderOutputs(outputs) {
@@ -707,8 +1164,9 @@ function renderDashboardHTML() {
         
         let icon = '📄';
         let badgeText = 'Document';
-        if (f.isDocx) { icon = '📝'; badgeText = 'Google Docs Ready'; }
-        if (f.isChecklist) { icon = '🛡️'; badgeText = 'PSF Audit Passed'; }
+        if (f.isDocx) { icon = '📝'; badgeText = 'Google Docs Ready (.docx)'; }
+        if (f.isMd && !f.isChecklist) { icon = '🔄'; badgeText = 'Synced Parity (.md)'; }
+        if (f.isChecklist) { icon = '🛡️'; badgeText = 'Audit Checklist Report'; }
 
         const sizeKb = Math.round(f.size / 1024);
 
@@ -733,14 +1191,16 @@ function renderDashboardHTML() {
       if (!currentClient) return alert('Please select a client');
       const btn = document.getElementById('btnGenerate');
       const originalText = btn.innerHTML;
-      btn.innerHTML = '<span>⏳</span> Generating SOW into EXTERNAL/...';
+      btn.innerHTML = '<span>⏳</span> Generating ' + SPECS[currentProvider].name + ' SOW into EXTERNAL/...';
       btn.disabled = true;
 
       const payload = {
         client: currentClient,
+        provider: currentProvider,
         project: document.getElementById('projectTitle').value,
         type: document.getElementById('engagementType').value,
         fee: parseFloat(document.getElementById('feeInput').value) || 50000,
+        contextNotes: document.getElementById('contextNotes').value,
       };
 
       try {
@@ -751,7 +1211,7 @@ function renderDashboardHTML() {
         });
         const data = await res.json();
         if (data.success) {
-          alert('✅ SOW Document and PSF Audit successfully saved into AG_Client/' + currentClient + '/EXTERNAL/ !');
+          alert('✅ ' + SPECS[currentProvider].name + ' SOW Document and Compliance Audit saved into AG_Client/' + currentClient + '/EXTERNAL/ !');
           selectClient(currentClient);
         } else {
           alert('❌ Generation error: ' + data.error);
@@ -766,9 +1226,22 @@ function renderDashboardHTML() {
 
     async function triggerValidate() {
       if (!currentClient) return;
-      const res = await fetch('/api/validate?client=' + encodeURIComponent(currentClient));
+      const res = await fetch('/api/validate?client=' + encodeURIComponent(currentClient) + '&provider=' + encodeURIComponent(currentProvider));
       const data = await res.json();
-      alert('PSF Audit Score: ' + data.score + '% (' + data.passedCount + '/' + data.totalCount + ' checks passed)');
+      
+      const section = document.getElementById('checklistSection');
+      const banner = document.getElementById('scorecardBanner');
+      section.style.display = 'block';
+      document.getElementById('scorecardPct').textContent = data.score + '%';
+      document.getElementById('scorecardTitle').textContent = data.standardName + ': ' + data.status;
+      document.getElementById('scorecardSubtitle').textContent = data.passedCount + ' of ' + data.totalCount + ' quality criteria satisfied.';
+      
+      if (data.isCompliant) {
+        banner.classList.remove('blocked');
+      } else {
+        banner.classList.add('blocked');
+      }
+
       selectClient(currentClient);
     }
 
@@ -782,15 +1255,15 @@ function renderDashboardHTML() {
     }
 
     async function promptNewClient() {
-      const name = prompt('Enter new client name (e.g. Acme Innovations):');
-      if (!name) return;
+      const name = prompt('Enter new engagement / client folder name (e.g. Acme Cloud Corp):');
+      if (!name || !name.trim()) return;
       await fetch('/api/new-client', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name: name.trim() }),
       });
-      await init();
-      selectClient(name);
+      await loadRecentClients(false);
+      selectClient(name.trim());
     }
 
     window.onload = init;
@@ -821,8 +1294,25 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  // API: List Clients from AG_Client
+  // API: List Clients (supports recent limit/offset and search)
   if (pathname === "/api/clients") {
+    const isRecent = parsedUrl.query.recent === "true";
+    const limit = parsedUrl.query.limit ? parseInt(parsedUrl.query.limit, 10) : null;
+    const offset = parsedUrl.query.offset ? parseInt(parsedUrl.query.offset, 10) : 0;
+    const searchQuery = parsedUrl.query.search;
+
+    if (searchQuery) {
+      const matches = clientResolver.searchClients(searchQuery);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify(matches));
+    }
+
+    if (isRecent) {
+      const recentData = clientResolver.listRecentClients(limit, offset);
+      res.writeHead(200, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify(recentData));
+    }
+
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify(clientResolver.listClients()));
   }
@@ -838,39 +1328,24 @@ const server = http.createServer(async (req, res) => {
     return res.end(JSON.stringify(getClientDetails(clientName)));
   }
 
-  // API: Generate SOW & Slides
-  if (pathname === "/api/generate" && req.method === "POST") {
-    let body = "";
-    req.on("data", (chunk) => (body += chunk));
-    req.on("end", async () => {
+  // API: Upload Input File into AG_Client/<Client>/INTERNAL/
+  if (pathname === "/api/upload-input" && req.method === "POST") {
+    const clientName = parsedUrl.query.client;
+    const fileName = parsedUrl.query.filename || "discovery-input.txt";
+
+    if (!clientName) {
+      res.writeHead(400, { "Content-Type": "application/json" });
+      return res.end(JSON.stringify({ error: "Missing client name" }));
+    }
+
+    const chunks = [];
+    req.on("data", (chunk) => chunks.push(chunk));
+    req.on("end", () => {
       try {
-        const { client, project, type, fee } = JSON.parse(body);
-        const dateStr = new Date().toISOString().split("T")[0];
-        const paths = clientResolver.getClientPaths(client);
-        const outputsDir = paths.outputDir;
-        if (!fs.existsSync(outputsDir)) fs.mkdirSync(outputsDir, { recursive: true });
-
-        // Build SOW
-        const sowBuilder = new SowBuilder({ client, project, engagementType: type, totalFee: fee, date: dateStr });
-        const doc = sowBuilder.buildDocument({ client, project, engagementType: type, totalFee: fee });
-        const safeClientName = client.toLowerCase().replace(/[\s_-]+/g, "_");
-        const docxPath = path.join(outputsDir, `sow-${safeClientName}-${dateStr}.docx`);
-        await sowBuilder.saveToFile(doc, docxPath);
-
-        // Markdown Sync
-        const mdPath = path.join(outputsDir, `sow-${safeClientName}-${dateStr}.md`);
-        await convertDocxToMarkdown(docxPath, { outputPath: mdPath });
-
-        // Audit
-        const mdContent = fs.readFileSync(mdPath, "utf-8");
-        const validator = new PsfValidator();
-        const validation = validator.validate(mdContent, { client, project, partner: BRAND.name });
-        const auditReport = validator.generateReport(validation, { client, project });
-        const auditPath = path.join(outputsDir, `psf-checklist-${safeClientName}-${dateStr}.md`);
-        fs.writeFileSync(auditPath, auditReport, "utf-8");
-
+        const buffer = Buffer.concat(chunks);
+        const saved = clientResolver.saveInputFile(clientName, fileName, buffer);
         res.writeHead(200, { "Content-Type": "application/json" });
-        return res.end(JSON.stringify({ success: true, score: validation.score }));
+        return res.end(JSON.stringify({ success: true, file: saved }));
       } catch (err) {
         res.writeHead(500, { "Content-Type": "application/json" });
         return res.end(JSON.stringify({ success: false, error: err.message }));
@@ -879,19 +1354,116 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // API: Validate
+  // API: Analyze PRD and Discovery Inputs
+  if (pathname === "/api/analyze-prd" && req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", async () => {
+      try {
+        const { client, contextNotes } = JSON.parse(body);
+        const inputs = clientResolver.getInputFiles(client);
+        const filePaths = inputs.map((f) => f.fullPath);
+        const analysis = await prdAnalyzer.analyzeDiscovery(filePaths, contextNotes);
+        res.writeHead(200, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify(analysis));
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // API: Generate Hyperscaler SOW & Parity Markdown
+  if (pathname === "/api/generate" && req.method === "POST") {
+    let body = "";
+    req.on("data", (chunk) => (body += chunk));
+    req.on("end", async () => {
+      try {
+        const { client, provider = "google", project, type, fee, contextNotes = "" } = JSON.parse(body);
+        const dateStr = new Date().toISOString().split("T")[0];
+        const paths = clientResolver.getClientPaths(client);
+        const outputsDir = paths.outputDir;
+        if (!fs.existsSync(outputsDir)) fs.mkdirSync(outputsDir, { recursive: true });
+
+        // Build SOW
+        const sowBuilder = new SowBuilder({
+          client,
+          provider,
+          project,
+          engagementType: type,
+          totalFee: fee,
+          date: dateStr,
+          contextNotes,
+        });
+
+        const doc = sowBuilder.buildDocument({
+          client,
+          provider,
+          project,
+          engagementType: type,
+          totalFee: fee,
+          contextNotes,
+        });
+
+        const safeClientName = client.toLowerCase().replace(/[\s_-]+/g, "_");
+        const docxFileName = `sow-${safeClientName}-${provider}-${dateStr}.docx`;
+        const docxPath = path.join(outputsDir, docxFileName);
+        await sowBuilder.saveToFile(doc, docxPath);
+
+        // Markdown Parity Sync
+        const mdFileName = `sow-${safeClientName}-${provider}-${dateStr}.md`;
+        const mdPath = path.join(outputsDir, mdFileName);
+        await convertDocxToMarkdown(docxPath, { outputPath: mdPath });
+
+        // Hyperscaler Checklist Audit
+        const mdContent = fs.readFileSync(mdPath, "utf-8");
+        const validator = new SowValidator();
+        const validation = validator.validate(mdContent, {
+          client,
+          provider,
+          project,
+          partner: BRAND.name,
+        });
+
+        const auditReport = validator.generateReport(validation, { client, project, provider });
+        const auditFileName = `checklist-${safeClientName}-${provider}-${dateStr}.md`;
+        const auditPath = path.join(outputsDir, auditFileName);
+        fs.writeFileSync(auditPath, auditReport, "utf-8");
+
+        res.writeHead(200, { "Content-Type": "application/json" });
+        return res.end(
+          JSON.stringify({
+            success: true,
+            score: validation.score,
+            status: validation.status,
+            docxFileName,
+            auditFileName,
+          })
+        );
+      } catch (err) {
+        res.writeHead(500, { "Content-Type": "application/json" });
+        return res.end(JSON.stringify({ success: false, error: err.message }));
+      }
+    });
+    return;
+  }
+
+  // API: Validate SOW
   if (pathname === "/api/validate") {
     const client = parsedUrl.query.client;
+    const provider = parsedUrl.query.provider || "google";
     const paths = clientResolver.getClientPaths(client);
     const outputs = clientResolver.getOutputFiles(client);
-    const docxFile = outputs.find((f) => f.isDocx);
+    const docxFile = outputs.find((f) => f.isDocx && (f.name.includes(provider) || !f.name.includes("-aws-") && !f.name.includes("-azure-")));
+    
     if (!docxFile) {
       res.writeHead(404, { "Content-Type": "application/json" });
       return res.end(JSON.stringify({ error: "SOW file not found in EXTERNAL/" }));
     }
     const { markdown } = await convertDocxToMarkdown(docxFile.fullPath);
-    const validator = new PsfValidator();
-    const result = validator.validate(markdown, { client, partner: BRAND.name });
+    const validator = new SowValidator();
+    const result = validator.validate(markdown, { client, provider, partner: BRAND.name });
     res.writeHead(200, { "Content-Type": "application/json" });
     return res.end(JSON.stringify(result));
   }

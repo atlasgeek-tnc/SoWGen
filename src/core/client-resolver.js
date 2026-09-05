@@ -31,6 +31,38 @@ class ClientResolver {
       .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
   }
 
+  // Get clients sorted by last modified time (most recent first)
+  listRecentClients(limit = null, offset = 0) {
+    if (!fs.existsSync(this.baseDir)) return [];
+    const clientsWithStats = fs
+      .readdirSync(this.baseDir, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && !entry.name.startsWith("."))
+      .map((entry) => {
+        const fullPath = path.join(this.baseDir, entry.name);
+        try {
+          const stats = fs.statSync(fullPath);
+          return {
+            name: entry.name,
+            mtime: stats.mtime,
+          };
+        } catch (e) {
+          return { name: entry.name, mtime: new Date(0) };
+        }
+      })
+      .sort((a, b) => b.mtime - a.mtime);
+
+    const total = clientsWithStats.length;
+    const paged = limit ? clientsWithStats.slice(offset, offset + limit) : clientsWithStats.slice(offset);
+    return {
+      total,
+      hasMore: offset + paged.length < total,
+      clients: paged.map((c) => ({
+        name: c.name,
+        mtime: c.mtime.toISOString(),
+      })),
+    };
+  }
+
   // Resolve directory structure for a specific client
   getClientPaths(clientName) {
     // Exact match first, then case-insensitive / normalized match
@@ -137,6 +169,37 @@ class ClientResolver {
           isChecklist: entry.name.startsWith("psf-checklist-"),
         };
       });
+  }
+
+  // Search across all clients matching query
+  searchClients(query = "") {
+    const all = this.listClients();
+    if (!query || !query.trim()) return all;
+    const q = query.trim().toLowerCase();
+    return all.filter((name) => name.toLowerCase().includes(q));
+  }
+
+  // Save an uploaded input file (PRD, transcript, doc) into client's INTERNAL folder
+  saveInputFile(clientName, fileName, buffer) {
+    const { clientDir, inputDir } = this.getClientPaths(clientName);
+    // Ensure target input directory is specifically INTERNAL if possible
+    let targetDir = inputDir;
+    if (path.basename(targetDir) !== "INTERNAL" && path.basename(targetDir) !== "Internal" && path.basename(targetDir) !== "INT") {
+      targetDir = path.join(clientDir, "INTERNAL");
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+    }
+
+    const safeFileName = path.basename(fileName).replace(/[^a-zA-Z0-9._-]/g, "_");
+    const targetPath = path.join(targetDir, safeFileName);
+    fs.writeFileSync(targetPath, buffer);
+    return {
+      name: safeFileName,
+      fullPath: targetPath,
+      size: buffer.length,
+      relativePath: path.relative(clientDir, targetPath),
+    };
   }
 }
 

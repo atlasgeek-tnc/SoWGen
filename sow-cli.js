@@ -5,17 +5,17 @@ const path = require("path");
 const { program } = require("commander");
 
 const SowBuilder = require("./src/core/sow-builder");
-const PsfValidator = require("./src/core/psf-validator");
+const SowValidator = require("./src/core/sow-validator");
+const clientResolver = require("./src/core/client-resolver");
 const { convertDocxToMarkdown } = require("./src/sync/docx-to-md");
 const SyncWatcher = require("./src/sync/sync-watcher");
 const BRAND = require("./src/templates/brand-theme");
+const HYPERSCALER_SPECS = require("./src/templates/hyperscaler-specs");
 
 program
   .name("sow-manager")
-  .description("Atlas Geek SOW Manager — Google PSF/DAF Compliant SOW Document Generator")
-  .version("2.0.0");
-
-const clientResolver = require("./src/core/client-resolver");
+  .description("Atlas Geek SOW Manager — Multi-Hyperscaler SOW Generator (Google Cloud, AWS, Azure, Agnostic)")
+  .version("2.1.0");
 
 // Helper to ensure client directory structure
 function getClientPaths(clientName) {
@@ -28,102 +28,87 @@ function getClientPaths(clientName) {
   };
 }
 
-// Helper to scan PRD or input context if present
-function loadClientContext(clientName, outputsDir) {
-  let executiveSummary = null;
-  let inScope = null;
-  let outOfScope = null;
-
-  // Check for existing PRD file in outputs
-  if (fs.existsSync(outputsDir)) {
-    const files = fs.readdirSync(outputsDir);
-    const prdFile = files.find((f) => f.startsWith("prd-") && f.endsWith(".md"));
-    if (prdFile) {
-      const content = fs.readFileSync(path.join(outputsDir, prdFile), "utf-8");
-      // Extract summary
-      const execMatch = content.match(/## 1\. Executive Summary([\s\S]*?)(## 2|$)/i);
-      if (execMatch) {
-        executiveSummary = execMatch[1].replace(/\n+/g, " ").trim();
-      }
-    }
-  }
-
-  return { executiveSummary, inScope, outOfScope };
-}
-
 // ==========================================
-// COMMAND: GENERATE (Full SOW + Slides + Audit)
+// COMMAND: GENERATE (Full Hyperscaler SOW + Audit)
 // ==========================================
 program
   .command("generate")
-  .description("Generate complete SOW (.docx), Slide Deck (.pptx), Markdown sync, and Google PSF audit")
+  .description("Generate complete SOW (.docx), Markdown sync, and Hyperscaler compliance audit")
   .requiredOption("-c, --client <name>", "Client name / directory identifier")
-  .option("-p, --project <name>", "Project title", "Google Cloud Modernization & Deployment")
-  .option("-t, --type <type>", "Google PSF engagement type (Foundations/Migration/Implementation/Deployment)", "Implementation")
+  .option("--provider <cloud>", "Cloud provider: google | aws | azure | agnostic", "google")
+  .option("-p, --project <name>", "Project title")
+  .option("-t, --type <type>", "Engagement scope type")
   .option("-f, --fee <number>", "Total engagement fixed fee in USD", (val) => parseInt(val, 10), 50000)
+  .option("-n, --notes <text>", "Context notes or PRD summary text", "")
   .action(async (options) => {
-    const { client, project, type, fee } = options;
+    const { client, provider = "google", fee, notes = "" } = options;
+    const spec = HYPERSCALER_SPECS[provider.toLowerCase()] || HYPERSCALER_SPECS.google;
+    const project = options.project || `${spec.name} Modernization & Deployment`;
+    const type = options.type || spec.defaultEngagementType;
     const dateStr = new Date().toISOString().split("T")[0];
     const { outputsDir } = getClientPaths(client);
-    const context = loadClientContext(client, outputsDir);
 
     console.log(`\n======================================================`);
-    console.log(`🚀 ATLAS GEEK SOW MANAGER — GOOGLE PSF/DAF PIPELINE`);
+    console.log(`🚀 ATLAS GEEK SOW MANAGER — HYPERSCALER PIPELINE`);
     console.log(`======================================================`);
     console.log(`Client:          ${client}`);
+    console.log(`Cloud Provider:  ${spec.name} (${provider.toUpperCase()})`);
     console.log(`Project:         ${project}`);
-    console.log(`Engagement Type: Google Cloud PSF: ${type}`);
-    console.log(`Commercials:     Fixed Price $${fee.toLocaleString()} USD (70/30 PSF Split)`);
+    console.log(`Engagement Type: ${type}`);
+    console.log(`Commercials:     Fixed Price $${fee.toLocaleString()} USD (${spec.commercialModel})`);
     console.log(`Output Folder:   ${outputsDir}\n`);
 
     // 1. Build SOW DOCX
-    console.log(`📄 Step 1: Compiling Google PSF/DAF compliant SOW (.docx)...`);
+    console.log(`📄 Step 1: Compiling ${spec.name} compliant SOW (.docx)...`);
     const sowBuilder = new SowBuilder({
       client,
+      provider,
       project,
       engagementType: type,
       totalFee: fee,
       date: dateStr,
+      contextNotes: notes,
     });
 
     const doc = sowBuilder.buildDocument({
       client,
+      provider,
       project,
       engagementType: type,
       totalFee: fee,
-      executiveSummary: context.executiveSummary,
-      inScope: context.inScope,
-      outOfScope: context.outOfScope,
+      contextNotes: notes,
     });
 
-    const docxFileName = `sow-${client.toLowerCase()}-${dateStr}.docx`;
+    const safeClientName = client.toLowerCase().replace(/[\s_-]+/g, "_");
+    const docxFileName = `sow-${safeClientName}-${provider}-${dateStr}.docx`;
     const docxPath = path.join(outputsDir, docxFileName);
     await sowBuilder.saveToFile(doc, docxPath);
     console.log(`   ✅ SOW DOCX created: ${docxFileName}`);
 
     // 2. Synchronize to Markdown for local parity
     console.log(`\n🔄 Step 2: Synchronizing SOW to local Markdown representation...`);
-    const mdFileName = `sow-${client.toLowerCase()}-${dateStr}.md`;
+    const mdFileName = `sow-${safeClientName}-${provider}-${dateStr}.md`;
     const mdPath = path.join(outputsDir, mdFileName);
     await convertDocxToMarkdown(docxPath, { outputPath: mdPath });
     console.log(`   ✅ Synced Markdown created: ${mdFileName}`);
 
-    // 3. Run Google PSF/DAF Checklist Audit
-    console.log(`\n🔍 Step 3: Auditing against Google Cloud PSF/DAF Official Checklist...`);
+    // 3. Run Hyperscaler Checklist Audit
+    console.log(`\n🔍 Step 3: Auditing against ${spec.governingRules}...`);
     const mdContent = fs.readFileSync(mdPath, "utf-8");
-    const validator = new PsfValidator();
+    const validator = new SowValidator();
     const validation = validator.validate(mdContent, {
       client,
+      provider,
       project,
       partner: BRAND.name,
     });
 
-    const auditReport = validator.generateReport(validation, { client, project });
-    const auditFileName = `psf-checklist-${client.toLowerCase()}-${dateStr}.md`;
+    const auditReport = validator.generateReport(validation, { client, project, provider });
+    const auditFileName = `checklist-${safeClientName}-${provider}-${dateStr}.md`;
     const auditPath = path.join(outputsDir, auditFileName);
     fs.writeFileSync(auditPath, auditReport, "utf-8");
 
-    console.log(`   ✅ PSF Audit Score: ${validation.score}% (${validation.passedCount}/${validation.totalCount} checks passed)`);
+    console.log(`   ✅ Compliance Score: ${validation.score}% (${validation.passedCount}/${validation.totalCount} checks passed) — Status: ${validation.status}`);
     console.log(`   ✅ Audit Report saved: ${auditFileName}`);
 
     console.log(`\n======================================================`);
@@ -133,23 +118,24 @@ program
     console.log(`📂 ${outputsDir}`);
     console.log(`\nCloud Sync Notes:`);
     console.log(`1. Google Drive Desktop will automatically upload these files to Google Drive.`);
-    console.log(`2. Open '${docxFileName}' in Google Docs to edit or share with Google PSF reviewers.`);
+    console.log(`2. Open '${docxFileName}' in Google Docs or Microsoft Word to review and share.`);
     console.log(`3. Run 'node sow-cli.js watch --client ${client}' to monitor and auto-sync online edits back to local markdown.\n`);
   });
 
 // ==========================================
-// COMMAND: VALIDATE (PSF Checklist Audit)
+// COMMAND: VALIDATE (Hyperscaler Checklist Audit)
 // ==========================================
 program
   .command("validate")
-  .description("Audit an existing client SOW against Google Cloud PSF/DAF Checklist")
+  .description("Audit an existing client SOW against specified Hyperscaler Checklist")
   .requiredOption("-c, --client <name>", "Client name")
+  .option("--provider <cloud>", "Cloud provider: google | aws | azure | agnostic", "google")
   .action(async (options) => {
-    const { client } = options;
+    const { client, provider = "google" } = options;
     const { outputsDir } = getClientPaths(client);
     const files = fs.readdirSync(outputsDir);
 
-    const docxFile = files.find((f) => f.startsWith("sow-") && f.endsWith(".docx"));
+    const docxFile = files.find((f) => f.startsWith("sow-") && f.endsWith(".docx") && (f.includes(provider) || !f.includes("-aws-") && !f.includes("-azure-")));
     if (!docxFile) {
       console.error(`❌ No SOW docx found in ${outputsDir}`);
       process.exit(1);
@@ -157,10 +143,10 @@ program
 
     const docxPath = path.join(outputsDir, docxFile);
     const { markdown } = await convertDocxToMarkdown(docxPath);
-    const validator = new PsfValidator();
-    const result = validator.validate(markdown, { client, partner: BRAND.name });
+    const validator = new SowValidator();
+    const result = validator.validate(markdown, { client, provider, partner: BRAND.name });
 
-    console.log(validator.generateReport(result, { client }));
+    console.log(validator.generateReport(result, { client, provider }));
   });
 
 // ==========================================

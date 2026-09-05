@@ -1,6 +1,6 @@
-# Atlas Geek SOW Manager — Google PSF/DAF Edition
+# Atlas Geek SOW Manager — Multi-Hyperscaler Studio
 
-This repository contains the **Atlas Geek SOW Manager**, an enterprise delivery system that converts client discovery inputs (transcripts, RFPs, architecture docs) into client-ready, **Google Cloud Partner Services Funds (PSF) and Deployment Acceleration Fund (DAF)** compliant Statements of Work and synchronized markdown documents.
+This repository contains the **Atlas Geek SOW Manager**, an enterprise delivery system that converts client discovery inputs (PRD documents, transcripts, RFPs, architecture specs) into client-ready, **Hyperscaler-Compliant Statements of Work (SOW)** and synchronized markdown documents.
 
 - **Partner**: Atlas Geek (`https://atlasgeek.in`)
 - **Contact**: `business@atlasgeek.in`
@@ -10,100 +10,133 @@ This repository contains the **Atlas Geek SOW Manager**, an enterprise delivery 
 
 ---
 
-## Deliverables Produced
+## Supported Hyperscalers & Cloud Programs
 
-For each client engagement, deliverables are generated and saved directly in:
+The SOW Manager is hyperscaler-neutral and enforces provider-specific commercial models, tenant ownership clauses, architect certifications, and governance checklists:
+
+1. **Google Cloud (GCP)**:
+   - **Program**: Partner Services Funds (PSF) / Deployment Acceleration Fund (DAF)
+   - **Commercial Model**: Fixed Price (USD) Non-Commit (70% Completion / 30% Consumption Break-Even)
+   - **Validation**: Enforces the official **18-Point Google Cloud PSF/DAF Checklist**
+   - **Lead Role**: Atlas Geek Certified Professional Cloud Architect & DRP Tier 1 ID (`AG-DRP-88492`)
+   - **Approvers**: Regional routing (`psfapproversAPAC@google.com`, `psfapproversEMEA...`, etc.)
+
+2. **Amazon Web Services (AWS)**:
+   - **Program**: AWS Migration Acceleration Program (MAP 2.0) / APN Customer Engagements
+   - **Commercial Model**: Fixed Price (USD) Deliverable-Based (30% Landing Zone / 40% Workload Migration / 30% Handover & Well-Architected Review)
+   - **Validation**: Enforces **AWS APN & Well-Architected SOW Standards (16 Quality Checks)**
+   - **Lead Role**: Atlas Geek Certified AWS Solutions Architect - Professional
+
+3. **Microsoft Azure**:
+   - **Program**: Azure Migration & Modernization Program (AMMP) / Cloud Adoption Framework (CAF)
+   - **Commercial Model**: Fixed Price (USD) (30% Azure Landing Zone / 40% App & DB Migration / 30% Cutover & Sign-Off)
+   - **Validation**: Enforces **Microsoft Cloud Adoption Framework (CAF) SOW Standards (16 Quality Checks)**
+   - **Lead Role**: Atlas Geek Certified Azure Solutions Architect Expert
+
+4. **Cloud Agnostic / Enterprise Architecture**:
+   - **Program**: Standard Enterprise Architecture & Digital Transformation
+   - **Commercial Model**: Milestone Deliverable Schedule (25% Blueprint / 35% Platform / 25% Cutover / 15% Handover)
+   - **Validation**: Enforces **Enterprise Solution Architecture Quality Standards (15 Quality Checks)**
+   - **Lead Role**: Atlas Geek Senior Solutions Architect
+
+---
+
+## Web Dashboard Highlights (`http://localhost:4100`)
+
+- **Smart Recent Sidebar**:
+  - Automatically surfaces the **5 most recent clients** you worked on (stat-sorted by `mtime`).
+  - **See More (+5)** button dynamically loads subsequent recent clients.
+  - **Instant Search Bar** filters dynamically across all 59+ clients in `AG_Client`.
+- **Hyperscaler Switcher**:
+  - One-click toggle between Google Cloud PSF, AWS MAP, Microsoft Azure AMMP, and Cloud Agnostic.
+  - Dynamically switches engagement types, tenant clauses, RACI rules, and milestone splits.
+- **Flexible PRD & Discovery Intake**:
+  - **Drag-and-Drop / File Upload**: Drop PRD files (`.docx`, `.md`, `.txt`, `.pdf`) directly into `AG_Client/<Client>/INTERNAL/`.
+  - **Context & Commentary Notes Box**: Type or paste client requirements, transcript summaries, or specific architectural constraints.
+  - **Intelligent Gap Detector**: Automatically maps workloads (Kubernetes, Managed SQL, Data Pipelines, IaC, GenAI) and flags missing prerequisites (sizing, target regions, cutover downtime windows) with quick-add answer buttons.
+- **Deliverables Hub**:
+  - Instant download and local opening of `.docx` SOWs, synchronized `.md` files, and compliance audit reports.
+- **Live Audit Scorecard**:
+  - Real-time pass/fail evaluation against the selected hyperscaler's review criteria.
+
+---
+
+## Deliverables Generated
+
+Deliverables are saved directly into each client's folder on Google Drive:
 `AG_Client/[ClientName]/EXTERNAL/`
 
-1. **`sow-[client]-[YYYY-MM-DD].docx`**: Formal Statement of Work with Atlas Geek logo, fully compliant with Google Cloud PSF/DAF review standards (ready to open & edit in Google Docs).
-2. **`sow-[client]-[YYYY-MM-DD].md`**: Local markdown representation kept in two-way parity with online Google Docs edits.
-3. **`psf-checklist-[client]-[YYYY-MM-DD].md`**: Official 18-point Google Cloud PSF/DAF audit scorecard (100% compliance verification).
-4. **`prd-[client]-[YYYY-MM-DD].md`**: Technical PRD working document (when PRD stage is executed).
-5. **`open-questions-[client].md`**: Client discovery clarification log.
-6. **`risk-register-[client].md`**: Client-specific risk register.
-
----
-
-## Google Cloud PSF / DAF Compliance Highlights
-
-Every generated SOW strictly implements Google Cloud's official review checklist:
-- **Engagement Categorization**: Foundations, Migration, Implementation, or Deployment.
-- **Customer Tenant & Direct Billing**: Explicit clause establishing deployment within Customer Tenant and direct billing for Google Cloud consumption.
-- **No Hourly Caps**: Deliverables structured by measurable milestones with durations, avoiding capped time-and-materials limits.
-- **Workloads & Environments**: Details of Google Cloud services across Development, UAT, and Production.
-- **Timeline Provisions**: Future-dated start dates (≥ 7 business days out) and term ending "pending acceptance of all deliverables".
-- **Google Certified Roles & DRP IDs**: Partner roles with Google Cloud certifications and DRP Tier 1 (50+) IDs (strictly excluding Google roles).
-- **Commercial PSF 70/30 Milestones**: Fixed Price in USD only, with 70% project completion and 30% consumption break-even payment milestones.
-- **Google Appendix**: 10:1 ROI justification, first 12 months estimated ARR, and regional approver contact matrix (`psfapprovers...`).
-
----
-
-## Google Docs & Google Drive Synchronization
-
-Because this repository is connected directly with `My Drive/AG_Client`:
-1. **Local → Cloud**: Any `.docx` generated locally in `EXTERNAL/` is immediately uploaded to Google Drive by Google Drive Desktop.
-2. **Online Editing**: Double-click `sow-[client]-[date].docx` in Google Drive to edit directly in **Google Docs**. Share with Google PSF approvers (`psfapprovers...`) with comments and edit access enabled.
-3. **Cloud → Local Two-Way Sync**:
-   - Edits made online save back to the `.docx` file in Google Drive, which Google Drive Desktop downloads to your Mac.
-   - Run the sync watcher to automatically detect updates and refresh the local markdown file:
-     ```bash
-     node sow-cli.js watch --client [ClientName]
-     ```
+1. **`sow-[client]-[provider]-[date].docx`**: Formatted Statement of Work with Atlas Geek branding and hyperscaler clauses (ready for Google Docs / Microsoft Word).
+2. **`sow-[client]-[provider]-[date].md`**: Local markdown representation kept in two-way parity with online Google Docs edits.
+3. **`checklist-[client]-[provider]-[date].md`**: Official audit scorecard verifying compliance against the provider's checklist.
 
 ---
 
 ## How to Use
 
-### 1. Launch Interactive Web Dashboard (UI)
+### 1. Launch Interactive Web Dashboard
 ```bash
 npm start
 # OR
 node sow-cli.js ui
 ```
-Then open your browser to `http://localhost:4100` to select clients, review inputs from `INTERNAL/`, configure fees, generate SOW documents, and verify Google PSF compliance.
+Open your browser to `http://localhost:4100`.
 
 ### 2. Generate SOW via CLI
 ```bash
-node sow-cli.js generate --client "[ClientName]" --project "[Project Title]" --type "[Foundations|Migration|Implementation|Deployment]" --fee [USD]
-```
-Example:
-```bash
-node sow-cli.js generate --client "Hectares Agrotech Private limited" --project "AI/ML Agricultural Modernization on Google Cloud" --type "Implementation" --fee 45000
+node sow-cli.js generate --client "[ClientName]" --provider [google|aws|azure|agnostic] --fee [USD] --notes "[Notes]"
 ```
 
-### 3. Audit SOW Against Google Cloud PSF Checklist
+Examples:
 ```bash
-node sow-cli.js validate --client "[ClientName]"
+# Google Cloud PSF SOW
+node sow-cli.js generate --client "Hectares Agrotech Private limited" --provider google --fee 45000
+
+# AWS MAP SOW
+node sow-cli.js generate --client "Medicodio" --provider aws --fee 55000
+
+# Microsoft Azure SOW
+node sow-cli.js generate --client "Callkaro.ai" --provider azure --fee 48000
+
+# Cloud Agnostic SOW with Context Notes
+node sow-cli.js generate --client "PGI" --provider agnostic --fee 60000 --notes "Migrate microservices to Kubernetes with high throughput PostgreSQL"
 ```
 
-### 4. Start Google Drive Desktop Real-Time Sync Watcher
+### 3. Audit Existing SOW
+```bash
+node sow-cli.js validate --client "[ClientName]" --provider [google|aws|azure|agnostic]
+```
+
+### 4. Real-Time Two-Way Google Docs Sync
 ```bash
 node sow-cli.js watch --client "[ClientName]"
 ```
 
 ---
 
-## Folder Structure
+## Architecture & Codebase Map
 
 ```text
 PRD_SOW_Agent/
 ├── assets/
-│   ├── atlasgeek_logo.png     <-- Atlas Geek official logo
+│   ├── atlasgeek_logo.png         <-- Official Atlas Geek branding
 │   └── atlasgeek_logo.jpg
 ├── src/
 │   ├── core/
-│   │   ├── client-resolver.js <-- Maps clients, inputs (INTERNAL/) & outputs (EXTERNAL/)
-│   │   ├── sow-builder.js     <-- Enterprise DOCX compiler with Google PSF clauses
-│   │   └── psf-validator.js   <-- Official 18-point Google PSF linter
-│   ├── sync/
-│   │   ├── docx-to-md.js      <-- DOCX-to-Markdown parser
-│   │   └── sync-watcher.js    <-- Real-time Google Drive Desktop change watcher
+│   │   ├── client-resolver.js     <-- AG_Client mapping (5 recent, See More, search, upload)
+│   │   ├── prd-analyzer.js        <-- PRD parsing, workload mapping & gap detection
+│   │   ├── sow-builder.js         <-- Multi-hyperscaler DOCX document generator
+│   │   ├── sow-validator.js       <-- Multi-hyperscaler checklist linter
+│   │   └── psf-validator.js       <-- Google PSF alias for backwards compatibility
 │   ├── templates/
-│   │   ├── brand-theme.js     <-- Atlas Geek branding tokens & colors
-│   │   └── psf-spec.js        <-- Google PSF checklist rules & approver routes
+│   │   ├── brand-theme.js         <-- Atlas Geek colors & styling
+│   │   ├── hyperscaler-specs.js   <-- Specifications for Google, AWS, Azure, Agnostic
+│   │   └── psf-spec.js            <-- Google PSF clauses & approvers
+│   ├── sync/
+│   │   ├── docx-to-md.js          <-- DOCX to Markdown synchronization
+│   │   └── sync-watcher.js        <-- Real-time Google Drive desktop watcher
 │   └── ui/
-│       └── server.js          <-- Interactive Web Dashboard (http://localhost:4100)
-├── sow-cli.js                 <-- Master CLI tool
-├── AGENTS.md                  <-- Master agent operating manual
-└── Readme.md                  <-- System documentation
+│       └── server.js              <-- Web Dashboard (port 4100)
+├── sow-cli.js                     <-- Unified CLI tool
+└── package.json
 ```
