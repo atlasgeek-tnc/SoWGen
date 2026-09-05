@@ -1,0 +1,17 @@
+{
+  "name": "atlas-geek-sow-manager",
+  "version": "2.0.0",
+  "scripts": {
+    "start": "node src/ui/server.js",
+    "ui": "node src/ui/server.js",
+    "generate": "node sow-cli.js generate",
+    "watch": "node sow-cli.js watch"
+  },
+  "dependencies": {
+    "chokidar": "^5.0.0",
+    "commander": "^15.0.0",
+    "docx": "^9.6.1",
+    "mammoth": "^1.12.2",
+    "pptxgenjs": "^4.0.1"
+  }
+}
