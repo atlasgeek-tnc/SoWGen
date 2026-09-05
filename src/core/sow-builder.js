@@ -126,7 +126,8 @@ class SowBuilder {
 
   createParagraph(text, options = {}) {
     return new Paragraph({
-      spacing: { before: 60, after: 60 },
+      alignment: options.alignment || AlignmentType.JUSTIFIED,
+      spacing: { before: 80, after: 100, line: 276 },
       children: [
         new TextRun({
           text,
@@ -143,7 +144,8 @@ class SowBuilder {
   createBullet(text, level = 0) {
     return new Paragraph({
       bullet: { level },
-      spacing: { before: 40, after: 40 },
+      alignment: AlignmentType.JUSTIFIED,
+      spacing: { before: 40, after: 60, line: 260 },
       children: [
         new TextRun({
           text,
@@ -160,7 +162,8 @@ class SowBuilder {
     const bgColor = isAccent ? BRAND.colors.accentLight : BRAND.colors.primaryLight;
 
     return new Paragraph({
-      spacing: { before: 180, after: 180 },
+      alignment: AlignmentType.JUSTIFIED,
+      spacing: { before: 180, after: 180, line: 276 },
       border: {
         left: { style: BorderStyle.SINGLE, size: 24, color: borderColor, space: 16 },
       },
@@ -177,7 +180,7 @@ class SowBuilder {
         new TextRun({ break: 1 }),
         new TextRun({
           text,
-          size: 18,
+          size: 19,
           color: BRAND.colors.body,
           font: BRAND.fonts.primary,
         }),
@@ -567,37 +570,58 @@ class SowBuilder {
     );
 
     // --- SECTION 9: COMMERCIAL TERMS & PRICING ---
-    const pricingRows = [];
-    const isPlaceholder = data.usePlaceholderPricing !== false;
+    const isPlaceholder = data.usePlaceholderPricing === true;
+    const projectServiceFee = isPlaceholder ? "$XXXX USD" : `$${totalFee.toLocaleString()} USD`;
+    const discountFee = isPlaceholder ? "$0 USD" : (data.discount ? `$${data.discount.toLocaleString()} USD` : "$0 USD");
+    const grandTotalFee = isPlaceholder ? "$XXXX USD" : `$${totalFee.toLocaleString()} USD`;
+    const psfFundingFee = isPlaceholder ? "$XXXX USD" : `$${totalFee.toLocaleString()} USD`;
 
+    const pricingSummaryRows = [
+      [projectName, projectServiceFee],
+      ["Discount by AtlasGeek", discountFee],
+      ["Contract Grand Total", grandTotalFee],
+      [`Cloud Partner Services Funding (${spec.name} PSF/DAF)`, psfFundingFee],
+      ["Total Paid by the Customer", "$0 USD"],
+    ];
+
+    const milestoneRows = [];
     if (isPlaceholder) {
-      spec.milestoneSplit.forEach((m) => {
-        pricingRows.push([
-          m.name,
-          m.desc,
-          `${Math.round(m.pct * 100)}%`,
-          "$XXXX USD",
-        ]);
-      });
-
-      pricingRows.push([
-        "Total Professional Services Fee",
-        "Fixed Price Commercial Model (Seller to populate agreed fee upon PSF alignment)",
+      milestoneRows.push([
+        "Milestone 1 (70%): Project Completion & Acceptance",
+        "Formal Customer acceptance of all project deliverables (pending acceptance of all deliverables)",
+        "70%",
+        "$XXXX USD",
+      ]);
+      milestoneRows.push([
+        "Milestone 2 (30%): Cloud Consumption Break-Even",
+        "Post-completion operational review and Google Cloud platform consumption break-even",
+        "30%",
+        "$XXXX USD",
+      ]);
+      milestoneRows.push([
+        "Total Partner Funded Services",
+        `100% ${spec.name} Partner Services Funding`,
         "100%",
         "$XXXX USD",
       ]);
     } else {
-      let cumulativeFee = 0;
-      spec.milestoneSplit.forEach((m, idx) => {
-        const isLast = idx === spec.milestoneSplit.length - 1;
-        const amount = isLast ? totalFee - cumulativeFee : Math.round(totalFee * m.pct);
-        cumulativeFee += amount;
-        pricingRows.push([m.name, m.desc, `${Math.round(m.pct * 100)}%`, `$${amount.toLocaleString()} USD`]);
-      });
-
-      pricingRows.push([
-        "Total Professional Services Fee",
-        "Fixed Price Commercial Model (Exclusive of applicable local taxes)",
+      const m1Amount = Math.round(totalFee * 0.7);
+      const m2Amount = totalFee - m1Amount;
+      milestoneRows.push([
+        "Milestone 1 (70%): Project Completion & Acceptance",
+        "Formal Customer acceptance of all project deliverables (pending acceptance of all deliverables)",
+        "70%",
+        `$${m1Amount.toLocaleString()} USD`,
+      ]);
+      milestoneRows.push([
+        "Milestone 2 (30%): Cloud Consumption Break-Even",
+        "Post-completion operational review and Google Cloud platform consumption break-even",
+        "30%",
+        `$${m2Amount.toLocaleString()} USD`,
+      ]);
+      milestoneRows.push([
+        "Total Partner Funded Services",
+        `100% ${spec.name} Partner Services Funding (PSF/DAF)`,
         "100%",
         `$${totalFee.toLocaleString()} USD`,
       ]);
@@ -606,24 +630,69 @@ class SowBuilder {
     docChildren.push(
       this.createSectionHeading("9. Commercial Terms & Pricing"),
       this.createParagraph(
-        `This engagement is executed on a Fixed Price commercial basis in United States Dollars (USD), aligned with ${spec.commercialModel}. Pricing amounts are to be populated upon final commercial and funding approval.`
+        "The implementation timeline does not start until AtlasGeek has been provided access to Client's target environment(s), including any hardware, software, and remote access credentials necessary to execute this SOW. The client will provide access upon approval of the SOW before the kickoff meeting."
+      ),
+      this.createParagraph(
+        `All prices listed are in US Dollars (USD), executed on a Fixed Price commercial basis aligned with ${spec.commercialModel}. Anything not specified in the following pricing table is out of scope.`
+      ),
+      this.createTable(["Description", "Amount"], pricingSummaryRows, [6200, 3200]),
+      this.createSubHeading("9.1 Payment Terms"),
+      this.createParagraph(
+        "The contract terms shall expire 3 months after the project’s Kick-Off date. Upon the completion of this Term, this Statement of Work will no longer be valid. Extensions to this term will require a Change Order."
       ),
       this.createTable(
-        ["Payment Milestone", "Deliverables & Triggers", "Percentage", "Amount (USD)"],
-        pricingRows,
-        [2600, 3400, 1400, 1600]
+        ["Payment Milestone", "Invoice Date / Verification Triggers", "Percentage", "Amount (USD)"],
+        milestoneRows,
+        [2800, 3600, 1200, 1800]
       ),
-      this.createSubHeading("9.1 Commercial Payment Terms & Conditionality"),
       this.createCallout(
-        "Payment Terms Provision",
+        "Payment Terms & PSF Conditionality Provision",
         provider === "google"
-          ? "Payment milestones are strictly contingent upon Google Cloud PSF/DAF program rules. In the event that Google Cloud does not approve the Fund Request, Partner shall not obligate Customer to pay for the funded portions, provided Customer has complied with program eligibility requirements. Invoices are payable net thirty (30) days from milestone sign-off."
-          : `Invoices shall be rendered upon completion and formal customer sign-off of each milestone deliverable. All invoices are payable net thirty (30) days from receipt. Location of Work: Services shall be delivered remotely, with virtual workshops and video-conferencing coordination.`,
+          ? "Payment milestones are strictly contingent upon Google Cloud PSF/DAF program rules and verified Proof of Execution (POE). In the event that Google Cloud does not approve the Fund Request, Partner shall not obligate Customer to pay for the funded portions, provided Customer has complied with program eligibility requirements. Invoices are payable net thirty (30) days from milestone sign-off."
+          : `Invoices shall be rendered upon completion and formal customer sign-off of each milestone deliverable. All invoices are payable net thirty (30) days from receipt. Services shall be delivered remotely, with virtual workshops and video-conferencing coordination.`,
         false
+      ),
+      this.createSubHeading("9.2 Invoices Sent To"),
+      this.createTable(
+        ["Contact Attribute", "Specification"],
+        [
+          ["Full Name:", "Accounts Department"],
+          ["Title:", "Senior Accounts Executive"],
+          ["Email:", BRAND.email || "business@atlasgeek.in"],
+        ],
+        [3200, 6200]
       )
     );
 
-    // --- SECTION 10: SIGNATURES & APPROVALS ---
+    // --- SECTION 10: LIMITATIONS & CONTRACTUAL GOVERNANCE ---
+    docChildren.push(
+      this.createSectionHeading("10. Limitations & Contractual Governance"),
+      this.createSubHeading("10.1 Change in Scope"),
+      this.createParagraph(
+        "Significant changes to the scope, activities, expectations, or timeline identified above will result in creating a Change Order. Client or AtlasGeek may request modifications to an executed SoW by submitting a written change order request to the other party. If acceptable to both parties, the Change Order will be executed by the parties and will become part of the applicable executed SoW. Neither party will be bound by the terms of any Change Order until it is executed by both parties."
+      ),
+      this.createSubHeading("10.2 Caveats & Assumptions"),
+      this.createParagraph(
+        "Any “Caveats & Assumptions” described below are critical to a successful implementation of this SOW. Anything AtlasGeek assumes in this SOW impacts the estimates for the project timeline, level of effort, and pricing. Client confirms that the caveats and assumptions listed below are understood and accurate."
+      ),
+      this.createBullet(
+        "Point of Contact / Decision-Maker: Our timeline anticipates timely responses for any authorization, approval, and User Acceptance Testing (UAT) required. We expect same-business-day responses to maintain the committed timeline. AtlasGeek will require the customer to validate and test each environment to ensure the system operates as expected."
+      ),
+      this.createBullet(
+        "Deliverable Acceptance Window: AtlasGeek will deem the Client’s acceptance of any deliverables within 3 business days of delivery unless otherwise stated in writing via email. If no response is received within that time frame, deliverables will be deemed accepted. Once deliverables are deemed accepted, no further changes will be incorporated without a Change Order."
+      ),
+      this.createBullet(
+        "Timely Cooperation: During the project, AtlasGeek personnel will undoubtedly have questions about the Client’s systems and applications that are critical to delivering a successful project on time. The Client confirms that the Client’s team members will answer project and technical questions as they arise promptly."
+      ),
+      this.createBullet(
+        "Services Sign-off: If AtlasGeek receives no communication from the Client for 10 business days, AtlasGeek will close the project and bill for services rendered."
+      ),
+      this.createBullet(
+        "Term: Customer acknowledges that AtlasGeek will provide services not to exceed the Term defined for this SOW. The Term starts upon project Kickoff. Extensions to this term will require a Change Order and may incur additional costs."
+      )
+    );
+
+    // --- SECTION 11: SIGNATURES & APPROVALS ---
     const signaturesTable = [
       ["Authorized Signature", "Atlas Geek (Partner)", `${clientName} (Customer)`],
       ["Signature", "", ""],
@@ -637,13 +706,62 @@ class SowBuilder {
     ];
 
     docChildren.push(
-      this.createSectionHeading("10. Signatures & Approvals"),
+      this.createSectionHeading("11. Signatures & Approvals"),
       this.createParagraph(
         provider === "google"
-          ? "By signing below, the parties agree to the terms, activities, deliverables, and conditions set forth in this Statement of Work. Both parties acknowledge that this SOW is to be formally executed only after Google Cloud PSF Fund Request approval has been received."
-          : "By signing below, the authorized representatives of the parties agree to the terms, activities, deliverables, and conditions set forth in this Statement of Work."
+          ? "IN WITNESS WHEREOF, this Statement of Work has been executed by the Parties through their duly authorized officers as of the date of the last signature below. Both parties acknowledge that this SOW is to be formally executed only after Google Cloud PSF Fund Request approval has been received."
+          : "IN WITNESS WHEREOF, this Statement of Work has been executed by the authorized representatives of the Parties as of the date of the last signature below."
       ),
-      this.createTable(signaturesTable[0], signaturesTable.slice(1), [2600, 3200, 3200])
+      this.createTable(signaturesTable[0], signaturesTable.slice(1), [2600, 3400, 3400])
+    );
+
+    // --- EXHIBIT A: PSF DELIVERABLES REVIEW ---
+    const exhibitDeliverables = (data.deliverablesTable && data.deliverablesTable.slice(1)) || [
+      ["Phase 1: Discovery & Architecture", "Architecture Design Document (ADD), Network/IAM Specification", "High", "None", "[  ]"],
+      ["Phase 2: Build & Configuration", "Terraform IaC deployment, VPC configuration, IAM roles", "High", "None", "[  ]"],
+      ["Phase 3: Migration & Cutover", "Workload migration verification report, Production Cutover", "High", "None", "[  ]"],
+      ["Phase 4: Handover & Sign-Off", "As-built documentation, Operations Runbook, PSF Sign-Off", "High", "None", "[  ]"],
+    ];
+
+    const exhibitRows = exhibitDeliverables.map((d) => [
+      d[0],
+      d[2] || d[1],
+      "High",
+      "None",
+      "[  ]",
+    ]);
+
+    docChildren.push(
+      new Paragraph({ children: [new PageBreak()] }),
+      this.createSectionHeading("Exhibit A — PSF Deliverables Review"),
+      this.createTable(
+        ["Specification Attribute", "Review Detail"],
+        [
+          ["Customer:", clientName],
+          ["Implementation Start Date:", data.startDate || "TBD (Post Google PSF Approval)"],
+          ["Implementation End Date:", data.endDate || `TBD (Kickoff + ${data.durationWeeks || 4} Weeks)`],
+        ],
+        [3200, 6200]
+      ),
+      this.createSubHeading("Project Overview"),
+      this.createParagraph(
+        data.exhibitOverview ||
+          `AtlasGeek will partner with ${clientName} to architect, deploy, and operationalize ${spec.name} workloads. Our approach integrates industry-leading cloud engineering practices to ensure secure workload management, seamless developer experience, and measurable business outcomes directly within Customer Tenant.`
+      ),
+      this.createSubHeading("Success Criteria & Deliverables Acceptance Review"),
+      this.createParagraph(
+        "The project will be considered successfully delivered when all the following criteria and milestone deliverables are met:"
+      ),
+      this.createBullet("Functional & Technical Deliverable Acceptance"),
+      this.createBullet("Architecture, Security & IAM Access Governance Acceptance"),
+      this.createBullet("Developer Tooling & Knowledge Transfer Acceptance"),
+      this.createBullet("Formal Customer Sign-Off & PSF Milestone Verification"),
+      new Paragraph({ spacing: { before: 100, after: 60 }, children: [] }),
+      this.createTable(
+        ["Requirement / Phase", "Acceptance Criteria & Key Deliverables", "Priority", "Deviations", "Accepted (Y/N)"],
+        exhibitRows,
+        [2400, 4200, 1000, 1000, 800]
+      )
     );
 
     // --- HEADER AND FOOTER ---

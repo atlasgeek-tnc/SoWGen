@@ -26,8 +26,8 @@ const BRAND = {
   },
 
   fonts: {
-    primary: "Calibri",
-    header: "Calibri",
+    primary: "Nunito Sans",
+    header: "Nunito Sans",
   },
 };
 
