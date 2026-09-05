@@ -2,9 +2,8 @@
   "name": "atlas-geek-sow-manager",
   "version": "2.0.0",
   "scripts": {
-    "start": "node src/ui/server.js",
-    "ui": "node src/ui/server.js",
     "generate": "node sow-cli.js generate",
+    "validate": "node sow-cli.js validate",
     "watch": "node sow-cli.js watch"
   },
   "dependencies": {

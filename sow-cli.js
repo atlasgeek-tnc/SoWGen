@@ -147,23 +147,5 @@ program
     watcher.start();
   });
 
-// ==========================================
-// COMMAND: UI (Web Dashboard)
-// ==========================================
-program
-  .command("ui")
-  .description("Launch the interactive web dashboard for Atlas Geek SOW Manager")
-  .option("-p, --port <number>", "Port number", 4100)
-  .action((options) => {
-    const server = require("./src/ui/server");
-    const port = options.port || 4100;
-    server.listen(port, () => {
-      console.log(`\n======================================================`);
-      console.log(`🌐 ATLAS GEEK SOW MANAGER WEB DASHBOARD IS LIVE!`);
-      console.log(`======================================================`);
-      console.log(`👉 Open in your browser: http://localhost:${port}`);
-      console.log(`======================================================\n`);
-    });
-  });
-
 program.parse(process.argv);
+

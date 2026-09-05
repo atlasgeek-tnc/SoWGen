@@ -41,23 +41,19 @@ The SOW Manager is hyperscaler-neutral and enforces provider-specific commercial
 
 ---
 
-## Web Dashboard Highlights (`http://localhost:4100`)
+## Conversational AI Solutions Architect Workflow
 
-- **Smart Recent Sidebar**:
-  - Automatically surfaces the **5 most recent clients** you worked on (stat-sorted by `mtime`).
-  - **See More (+5)** button dynamically loads subsequent recent clients.
-  - **Instant Search Bar** filters dynamically across all 59+ clients in `AG_Client`.
-- **Hyperscaler Switcher**:
-  - One-click toggle between Google Cloud PSF, AWS MAP, Microsoft Azure AMMP, and Cloud Agnostic.
-  - Dynamically switches engagement types, tenant clauses, RACI rules, and milestone splits.
-- **Flexible PRD & Discovery Intake**:
-  - **Drag-and-Drop / File Upload**: Drop PRD files (`.docx`, `.md`, `.txt`, `.pdf`) directly into `AG_Client/<Client>/INTERNAL/`.
-  - **Context & Commentary Notes Box**: Type or paste client requirements, transcript summaries, or specific architectural constraints.
-  - **Intelligent Gap Detector**: Automatically maps workloads (Kubernetes, Managed SQL, Data Pipelines, IaC, GenAI) and flags missing prerequisites (sizing, target regions, cutover downtime windows) with quick-add answer buttons.
-- **Deliverables Hub**:
-  - Instant download and local opening of `.docx` SOWs, synchronized `.md` files, and compliance audit reports.
-- **Live Audit Scorecard**:
-  - Real-time pass/fail evaluation against the selected hyperscaler's review criteria.
+Instead of dealing with a browser UI, you work directly with your **AI Solutions Architect** in chat:
+
+1. **Client Intake**: 
+   - New client engagements are created naturally in Google Drive or via intake forms in `My Drive/AG_Client/<ClientName>/`.
+   - Place client discovery artifacts (PRDs, transcripts, technical notes, RFPs) in `INTERNAL/`.
+2. **Interactive Architectural Discovery**:
+   - Prompt your AI Architect: *"Let's build an SOW for [ClientName]"*.
+   - The AI inspects the PRD, identifies target hyperscalers, diagnoses gaps (e.g. database sizing, cutover downtime windows, VPC networking, compliance requirements), and asks targeted architectural questions.
+3. **Pristine SOW Generation**:
+   - The engine compiles a clean, beautifully formatted `sow-[client].docx` directly into `AG_Client/<ClientName>/EXTERNAL/sow-[client].docx`.
+   - Hyperscaler validation is performed 100% in-memory with zero temporary file pollution in client directories.
 
 ---
 
@@ -66,23 +62,13 @@ The SOW Manager is hyperscaler-neutral and enforces provider-specific commercial
 Deliverables are saved directly into each client's folder on Google Drive:
 `AG_Client/[ClientName]/EXTERNAL/`
 
-1. **`sow-[client]-[provider]-[date].docx`**: Formatted Statement of Work with Atlas Geek branding and hyperscaler clauses (ready for Google Docs / Microsoft Word).
-2. **`sow-[client]-[provider]-[date].md`**: Local markdown representation kept in two-way parity with online Google Docs edits.
-3. **`checklist-[client]-[provider]-[date].md`**: Official audit scorecard verifying compliance against the provider's checklist.
+- **`sow-[client].docx`**: Formatted Statement of Work with Atlas Geek branding and hyperscaler clauses (ready for Google Docs / Microsoft Word).
 
 ---
 
-## How to Use
+## CLI Usage
 
-### 1. Launch Interactive Web Dashboard
-```bash
-npm start
-# OR
-node sow-cli.js ui
-```
-Open your browser to `http://localhost:4100`.
-
-### 2. Generate SOW via CLI
+### 1. Generate SOW via CLI
 ```bash
 node sow-cli.js generate --client "[ClientName]" --provider [google|aws|azure|agnostic] --fee [USD] --notes "[Notes]"
 ```
@@ -102,12 +88,12 @@ node sow-cli.js generate --client "Callkaro.ai" --provider azure --fee 48000
 node sow-cli.js generate --client "PGI" --provider agnostic --fee 60000 --notes "Migrate microservices to Kubernetes with high throughput PostgreSQL"
 ```
 
-### 3. Audit Existing SOW
+### 2. Audit Existing SOW
 ```bash
 node sow-cli.js validate --client "[ClientName]" --provider [google|aws|azure|agnostic]
 ```
 
-### 4. Real-Time Two-Way Google Docs Sync
+### 3. Real-Time Google Docs Sync
 ```bash
 node sow-cli.js watch --client "[ClientName]"
 ```
@@ -123,20 +109,18 @@ PRD_SOW_Agent/
 │   └── atlasgeek_logo.jpg
 ├── src/
 │   ├── core/
-│   │   ├── client-resolver.js     <-- AG_Client mapping (5 recent, See More, search, upload)
+│   │   ├── client-resolver.js     <-- AG_Client mapping & directory hygiene
 │   │   ├── prd-analyzer.js        <-- PRD parsing, workload mapping & gap detection
 │   │   ├── sow-builder.js         <-- Multi-hyperscaler DOCX document generator
-│   │   ├── sow-validator.js       <-- Multi-hyperscaler checklist linter
+│   │   ├── sow-validator.js       <-- Multi-hyperscaler checklist validator
 │   │   └── psf-validator.js       <-- Google PSF alias for backwards compatibility
 │   ├── templates/
 │   │   ├── brand-theme.js         <-- Atlas Geek colors & styling
 │   │   ├── hyperscaler-specs.js   <-- Specifications for Google, AWS, Azure, Agnostic
 │   │   └── psf-spec.js            <-- Google PSF clauses & approvers
-│   ├── sync/
-│   │   ├── docx-to-md.js          <-- DOCX to Markdown synchronization
-│   │   └── sync-watcher.js        <-- Real-time Google Drive desktop watcher
-│   └── ui/
-│       └── server.js              <-- Web Dashboard (port 4100)
+│   └── sync/
+│       ├── docx-to-md.js          <-- DOCX to Markdown synchronization
+│       └── sync-watcher.js        <-- Real-time Google Drive desktop watcher
 ├── sow-cli.js                     <-- Unified CLI tool
 └── package.json
 ```
