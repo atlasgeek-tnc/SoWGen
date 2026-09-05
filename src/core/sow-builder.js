@@ -362,7 +362,7 @@ class SowBuilder {
       this.createSubHeading("3.1 End-State Architecture Diagram Overview"),
       this.createCallout(
         "Architecture Overview Diagram",
-        "[Architecture Diagram: End-state topology illustrating Customer on-prem/hybrid integrations, Google Cloud VPC networking, IAM hierarchy, compute/container workloads, database storage, CI/CD pipeline, and Cloud Operations monitoring. Refer to attached Slide Deck for full visual overview.]"
+        "[Architecture Diagram: End-state topology illustrating Customer on-prem/hybrid integrations, Google Cloud VPC networking, IAM hierarchy, compute/container workloads, database storage, CI/CD pipeline, and Cloud Operations monitoring.]"
       ),
       this.createParagraph(
         data.architectureOverview ||

@@ -5,7 +5,6 @@ const path = require("path");
 const { program } = require("commander");
 
 const SowBuilder = require("./src/core/sow-builder");
-const SlideDesigner = require("./src/core/slide-designer");
 const PsfValidator = require("./src/core/psf-validator");
 const { convertDocxToMarkdown } = require("./src/sync/docx-to-md");
 const SyncWatcher = require("./src/sync/sync-watcher");
@@ -13,7 +12,7 @@ const BRAND = require("./src/templates/brand-theme");
 
 program
   .name("sow-manager")
-  .description("Atlas Geek SOW Manager — Google PSF/DAF Compliant SOW & Slide Deck Generator")
+  .description("Atlas Geek SOW Manager — Google PSF/DAF Compliant SOW Document Generator")
   .version("2.0.0");
 
 const clientResolver = require("./src/core/client-resolver");
@@ -109,32 +108,8 @@ program
     await convertDocxToMarkdown(docxPath, { outputPath: mdPath });
     console.log(`   ✅ Synced Markdown created: ${mdFileName}`);
 
-    // 3. Generate Slide Presentation PPTX
-    console.log(`\n📊 Step 3: Generating Executive Slide Presentation (.pptx / Google Slides)...`);
-    const slideDesigner = new SlideDesigner({
-      client,
-      project,
-      engagementType: type,
-      totalFee: fee,
-      date: dateStr,
-    });
-
-    const presentation = slideDesigner.createPresentation({
-      client,
-      project,
-      engagementType: type,
-      totalFee: fee,
-      inScope: context.inScope,
-      outOfScope: context.outOfScope,
-    });
-
-    const pptxFileName = `slides-${client.toLowerCase()}-${dateStr}.pptx`;
-    const pptxPath = path.join(outputsDir, pptxFileName);
-    await slideDesigner.saveToFile(presentation, pptxPath);
-    console.log(`   ✅ Slide Presentation created: ${pptxFileName}`);
-
-    // 4. Run Google PSF/DAF Checklist Audit
-    console.log(`\n🔍 Step 4: Auditing against Google Cloud PSF/DAF Official Checklist...`);
+    // 3. Run Google PSF/DAF Checklist Audit
+    console.log(`\n🔍 Step 3: Auditing against Google Cloud PSF/DAF Official Checklist...`);
     const mdContent = fs.readFileSync(mdPath, "utf-8");
     const validator = new PsfValidator();
     const validation = validator.validate(mdContent, {
@@ -159,34 +134,7 @@ program
     console.log(`\nCloud Sync Notes:`);
     console.log(`1. Google Drive Desktop will automatically upload these files to Google Drive.`);
     console.log(`2. Open '${docxFileName}' in Google Docs to edit or share with Google PSF reviewers.`);
-    console.log(`3. Open '${pptxFileName}' in Google Slides for client/internal presentation.`);
-    console.log(`4. Run 'node sow-cli.js watch --client ${client}' to monitor and auto-sync online edits back to local markdown.\n`);
-  });
-
-// ==========================================
-// COMMAND: SLIDES (Only Slide Deck)
-// ==========================================
-program
-  .command("slides")
-  .description("Generate or refresh only the executive presentation slide deck (.pptx)")
-  .requiredOption("-c, --client <name>", "Client name / directory identifier")
-  .option("-p, --project <name>", "Project title", "Google Cloud Modernization")
-  .option("-t, --type <type>", "Google PSF engagement type", "Implementation")
-  .option("-f, --fee <number>", "Total engagement fixed fee in USD", (val) => parseInt(val, 10), 50000)
-  .action(async (options) => {
-    const { client, project, type, fee } = options;
-    const dateStr = new Date().toISOString().split("T")[0];
-    const { outputsDir } = getClientPaths(client);
-    const context = loadClientContext(client, outputsDir);
-
-    console.log(`📊 Generating executive presentation deck for ${client}...`);
-    const slideDesigner = new SlideDesigner({ client, project, engagementType: type, totalFee: fee, date: dateStr });
-    const presentation = slideDesigner.createPresentation({ client, project, engagementType: type, totalFee: fee, inScope: context.inScope, outOfScope: context.outOfScope });
-
-    const pptxFileName = `slides-${client.toLowerCase()}-${dateStr}.pptx`;
-    const pptxPath = path.join(outputsDir, pptxFileName);
-    await slideDesigner.saveToFile(presentation, pptxPath);
-    console.log(`✅ Slides successfully generated at: ${pptxPath}`);
+    console.log(`3. Run 'node sow-cli.js watch --client ${client}' to monitor and auto-sync online edits back to local markdown.\n`);
   });
 
 // ==========================================

@@ -23,23 +23,6 @@ const BRAND = {
     white: "FFFFFF",
   },
 
-  // PPTX Color codes (with #)
-  pptxColors: {
-    primary: "#3F51B5",
-    primaryDark: "#283593",
-    primaryLight: "#E8EAF6",
-    accent: "#FF7A00",
-    accentLight: "#FFF3E0",
-    dark: "#1E293B",
-    body: "#334155",
-    muted: "#64748B",
-    lightBg: "#F8FAFC",
-    border: "#E2E8F0",
-    success: "#059669",
-    danger: "#DC2626",
-    white: "#FFFFFF",
-  },
-
   fonts: {
     primary: "Calibri",
     header: "Calibri",

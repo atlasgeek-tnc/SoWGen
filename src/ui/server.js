@@ -5,7 +5,6 @@ const url = require("url");
 const { exec } = require("child_process");
 
 const SowBuilder = require("../core/sow-builder");
-const SlideDesigner = require("../core/slide-designer");
 const PsfValidator = require("../core/psf-validator");
 const clientResolver = require("../core/client-resolver");
 const { convertDocxToMarkdown } = require("../sync/docx-to-md");
@@ -565,10 +564,7 @@ function renderDashboardHTML() {
 
         <div class="action-row">
           <button class="btn btn-primary" id="btnGenerate" onclick="triggerGenerate()">
-            <span>⚡</span> Generate SOW & Slide Deck
-          </button>
-          <button class="btn btn-accent" id="btnSlides" onclick="triggerSlides()">
-            <span>📊</span> Refresh Slides Only
+            <span>⚡</span> Generate SOW Document
           </button>
           <button class="btn btn-outline" id="btnValidate" onclick="triggerValidate()">
             <span>🔍</span> Audit PSF Checklist
@@ -701,7 +697,7 @@ function renderDashboardHTML() {
       const grid = document.getElementById('deliverablesGrid');
       grid.innerHTML = '';
       if (!outputs || outputs.length === 0) {
-        grid.innerHTML = '<p style="color:var(--muted); font-size:0.9rem;">No deliverables generated yet in EXTERNAL/. Click "Generate SOW & Slide Deck" above.</p>';
+        grid.innerHTML = '<p style="color:var(--muted); font-size:0.9rem;">No deliverables generated yet in EXTERNAL/. Click "Generate SOW Document" above.</p>';
         return;
       }
 
@@ -712,7 +708,6 @@ function renderDashboardHTML() {
         let icon = '📄';
         let badgeText = 'Document';
         if (f.isDocx) { icon = '📝'; badgeText = 'Google Docs Ready'; }
-        if (f.isPptx) { icon = '📊'; badgeText = 'Google Slides Ready'; }
         if (f.isChecklist) { icon = '🛡️'; badgeText = 'PSF Audit Passed'; }
 
         const sizeKb = Math.round(f.size / 1024);
@@ -738,7 +733,7 @@ function renderDashboardHTML() {
       if (!currentClient) return alert('Please select a client');
       const btn = document.getElementById('btnGenerate');
       const originalText = btn.innerHTML;
-      btn.innerHTML = '<span>⏳</span> Generating into EXTERNAL/...';
+      btn.innerHTML = '<span>⏳</span> Generating SOW into EXTERNAL/...';
       btn.disabled = true;
 
       const payload = {
@@ -756,7 +751,7 @@ function renderDashboardHTML() {
         });
         const data = await res.json();
         if (data.success) {
-          alert('✅ SOW, Slide Deck, and PSF Audit successfully saved into AG_Client/' + currentClient + '/EXTERNAL/ !');
+          alert('✅ SOW Document and PSF Audit successfully saved into AG_Client/' + currentClient + '/EXTERNAL/ !');
           selectClient(currentClient);
         } else {
           alert('❌ Generation error: ' + data.error);
@@ -767,23 +762,6 @@ function renderDashboardHTML() {
         btn.innerHTML = originalText;
         btn.disabled = false;
       }
-    }
-
-    async function triggerSlides() {
-      if (!currentClient) return;
-      const payload = {
-        client: currentClient,
-        project: document.getElementById('projectTitle').value,
-        type: document.getElementById('engagementType').value,
-        fee: parseFloat(document.getElementById('feeInput').value) || 50000,
-      };
-      await fetch('/api/slides', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      alert('✅ Slides presentation regenerated in EXTERNAL/ !');
-      selectClient(currentClient);
     }
 
     async function triggerValidate() {
@@ -883,12 +861,6 @@ const server = http.createServer(async (req, res) => {
         const mdPath = path.join(outputsDir, `sow-${safeClientName}-${dateStr}.md`);
         await convertDocxToMarkdown(docxPath, { outputPath: mdPath });
 
-        // Slide Deck
-        const slideDesigner = new SlideDesigner({ client, project, engagementType: type, totalFee: fee, date: dateStr });
-        const pres = slideDesigner.createPresentation({ client, project, engagementType: type, totalFee: fee });
-        const pptxPath = path.join(outputsDir, `slides-${safeClientName}-${dateStr}.pptx`);
-        await slideDesigner.saveToFile(pres, pptxPath);
-
         // Audit
         const mdContent = fs.readFileSync(mdPath, "utf-8");
         const validator = new PsfValidator();
@@ -899,32 +871,6 @@ const server = http.createServer(async (req, res) => {
 
         res.writeHead(200, { "Content-Type": "application/json" });
         return res.end(JSON.stringify({ success: true, score: validation.score }));
-      } catch (err) {
-        res.writeHead(500, { "Content-Type": "application/json" });
-        return res.end(JSON.stringify({ success: false, error: err.message }));
-      }
-    });
-    return;
-  }
-
-  // API: Regenerate Slides
-  if (pathname === "/api/slides" && req.method === "POST") {
-    let body = "";
-    req.on("data", (chunk) => (body += chunk));
-    req.on("end", async () => {
-      try {
-        const { client, project, type, fee } = JSON.parse(body);
-        const dateStr = new Date().toISOString().split("T")[0];
-        const paths = clientResolver.getClientPaths(client);
-        const outputsDir = paths.outputDir;
-        const safeClientName = client.toLowerCase().replace(/[\s_-]+/g, "_");
-        const slideDesigner = new SlideDesigner({ client, project, engagementType: type, totalFee: fee, date: dateStr });
-        const pres = slideDesigner.createPresentation({ client, project, engagementType: type, totalFee: fee });
-        const pptxPath = path.join(outputsDir, `slides-${safeClientName}-${dateStr}.pptx`);
-        await slideDesigner.saveToFile(pres, pptxPath);
-
-        res.writeHead(200, { "Content-Type": "application/json" });
-        return res.end(JSON.stringify({ success: true }));
       } catch (err) {
         res.writeHead(500, { "Content-Type": "application/json" });
         return res.end(JSON.stringify({ success: false, error: err.message }));
